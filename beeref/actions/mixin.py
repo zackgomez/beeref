@@ -41,6 +41,13 @@ class ActionsMixin:
             func(arg)
         del self._post_create_functions
 
+        # Add a dedicated Quit item at the end of the context menu (right-click)
+        # for quick access, without changing the menubar structure.
+        quit_action = actions.get('quit')
+        if quit_action and quit_action.qaction:
+            self.context_menu.addSeparator()
+            self.context_menu.addAction(quit_action.qaction)
+
     def update_menu_and_actions(self):
         self._build_recent_files()
 
