@@ -32,30 +32,17 @@ class ActionsMixin:
     def build_menu_and_actions(self):
         """Creates a new menu or rebuilds the given menu."""
         self.context_menu = QtWidgets.QMenu(self)
-        self.toplevel_menus = []
         self.bee_actiongroups = defaultdict(list)
         self._post_create_functions = []
         self._create_actions()
         self._create_menu(self.context_menu, menu_structure)
+
         for func, arg in self._post_create_functions:
             func(arg)
         del self._post_create_functions
 
-        # Add a dedicated Quit item at the end of the context menu (right-click)
-        # for quick access, without changing the menubar structure.
-        quit_action = actions.get('quit')
-        if quit_action and quit_action.qaction:
-            self.context_menu.addSeparator()
-            self.context_menu.addAction(quit_action.qaction)
-
     def update_menu_and_actions(self):
         self._build_recent_files()
-
-    def create_menubar(self):
-        menu_bar = QtWidgets.QMenuBar()
-        for menu in self.toplevel_menus:
-            menu_bar.addMenu(menu)
-        return menu_bar
 
     def _store_checkable_setting(self, key, value):
         self.settings.setValue(key, value)
@@ -103,8 +90,6 @@ class ActionsMixin:
                 menu.addSeparator()
             if isinstance(item, dict):
                 submenu = menu.addMenu(item['menu'])
-                if menu == self.context_menu:
-                    self.toplevel_menus.append(submenu)
                 self._create_menu(submenu, item['items'])
 
         return menu

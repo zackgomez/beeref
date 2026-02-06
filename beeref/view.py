@@ -256,12 +256,6 @@ class BeeGraphicsView(MainControlsMixin,
             self.setVerticalScrollBarPolicy(
                 Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
-    def on_action_show_menubar(self, checked):
-        if checked:
-            self.parent.setMenuBar(self.create_menubar())
-        else:
-            self.parent.setMenuBar(None)
-
     def on_action_show_titlebar(self, checked):
         self.parent.setWindowFlag(
             Qt.WindowType.FramelessWindowHint, on=not checked)

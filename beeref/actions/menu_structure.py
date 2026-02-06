@@ -16,24 +16,16 @@
 MENU_SEPARATOR = 0
 
 menu_structure = [
+    'new_scene',
+    'open',
     {
-        'menu': '&File',
-        'items': [
-            'new_scene',
-            'open',
-            {
-                'menu': 'Open &Recent',
-                'items': '_build_recent_files',
-            },
-            MENU_SEPARATOR,
-            'save',
-            'save_as',
-            'export_scene',
-            'export_images',
-            MENU_SEPARATOR,
-            'quit',
-        ],
+        'menu': 'Open &Recent',
+        'items': '_build_recent_files',
     },
+    MENU_SEPARATOR,
+    'save',
+    'save_as',
+    MENU_SEPARATOR,
     {
         'menu': '&Edit',
         'items': [
@@ -61,7 +53,6 @@ menu_structure = [
             'fullscreen',
             'always_on_top',
             'show_scrollbars',
-            'show_menubar',
             'show_titlebar',
             MENU_SEPARATOR,
             'move_window',
@@ -131,4 +122,6 @@ menu_structure = [
             'debuglog',
         ],
     },
+    MENU_SEPARATOR,
+    'quit',
 ]

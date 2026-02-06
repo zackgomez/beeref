@@ -80,7 +80,8 @@ class Action:
                 return True
 
         for menu_item in menu_structure:
-            _get_path(menu_item)
+            if isinstance(menu_item, dict):
+                _get_path(menu_item)
 
         return path[::-1]
 
@@ -398,13 +399,6 @@ actions = ActionList([
         checkable=True,
         settings='View/show_scrollbars',
         callback='on_action_show_scrollbars',
-    ),
-    Action(
-        id='show_menubar',
-        text='Show &Menu Bar',
-        checkable=True,
-        settings='View/show_menubar',
-        callback='on_action_show_menubar',
     ),
     Action(
         id='show_titlebar',

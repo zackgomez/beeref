@@ -919,13 +919,6 @@ def test_on_action_always_on_top_unchecked(
     create_mock.assert_called_once()
 
 
-def test_on_action_show_menubar(view):
-    view.toplevel_menus = [QtWidgets.QMenu('Foo')]
-    view.on_action_show_menubar(True)
-    assert len(view.parent.menuBar().actions()) == 1
-    view.on_action_show_menubar(False)
-    assert view.parent.menuBar().actions() == []
-
 
 @patch('PyQt6.QtWidgets.QWidget.create')
 @patch('PyQt6.QtWidgets.QWidget.destroy')

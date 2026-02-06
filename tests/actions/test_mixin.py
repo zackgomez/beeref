@@ -213,23 +213,6 @@ def test_build_menu_and_actions_with_submenu(qapp):
             add_mock.assert_called_once_with(actions['foo'].qaction)
 
 
-@patch('beeref.actions.mixin.menu_structure',
-       [{'menu': 'Foo', 'items': []}])
-@patch('beeref.actions.mixin.actions',
-       ActionList([Action(
-           id='quit',
-           text='&Quit',
-           callback='on_foo',
-       )]))
-def test_context_menu_appends_quit_at_end(qapp):
-    widget = FooWidget()
-    with patch('PyQt6.QtWidgets.QMenu.addAction') as add_mock:
-        with patch('PyQt6.QtWidgets.QMenu.addSeparator') as sep_mock:
-            widget.build_menu_and_actions()
-            from beeref.actions.mixin import actions
-            sep_mock.assert_called_once_with()
-            add_mock.assert_called_once_with(actions['quit'].qaction)
-
 
 @patch('beeref.actions.mixin.menu_structure',
        [{'menu': 'Foo', 'items': ['foo']}])
@@ -382,9 +365,3 @@ def test_update_recent_files(triggered_mock, qapp):
     assert qaction1.text() == 'bar.bee'
 
 
-def test_create_menubar(qapp):
-    widget = FooWidget()
-    widget.toplevel_menus = [QtWidgets.QMenu('Foo')]
-    menubar = widget.create_menubar()
-    assert isinstance(menubar, QtWidgets.QMenuBar)
-    assert len(menubar.actions()) == 1
