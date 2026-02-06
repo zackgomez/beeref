@@ -59,6 +59,10 @@ class BeeGraphicsView(MainControlsMixin,
             QtGui.QBrush(QtGui.QColor(*constants.COLORS['Scene:Canvas'])))
         self.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.undo_stack = QtGui.QUndoStack(self)
         self.undo_stack.setUndoLimit(100)
@@ -243,18 +247,6 @@ class BeeGraphicsView(MainControlsMixin,
         self.parent.destroy()
         self.parent.create()
         self.parent.show()
-
-    def on_action_show_scrollbars(self, checked):
-        if checked:
-            self.setHorizontalScrollBarPolicy(
-                Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            self.setVerticalScrollBarPolicy(
-                Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        else:
-            self.setHorizontalScrollBarPolicy(
-                Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            self.setVerticalScrollBarPolicy(
-                Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
     def on_action_show_titlebar(self, checked):
         self.parent.setWindowFlag(
@@ -569,9 +561,6 @@ class BeeGraphicsView(MainControlsMixin,
     def on_action_settings(self):
         widgets.settings.SettingsDialog(self)
 
-    def on_action_keyboard_settings(self):
-        widgets.controls.ControlsDialog(self)
-
     def on_action_help(self):
         widgets.HelpDialog(self)
 
@@ -702,11 +691,6 @@ class BeeGraphicsView(MainControlsMixin,
         msg = 'No image data or text in clipboard or image too big'
         logger.info(msg)
         widgets.BeeNotification(self, msg)
-
-    def on_action_open_settings_dir(self):
-        dirname = os.path.dirname(self.settings.fileName())
-        QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl.fromLocalFile(dirname))
 
     def on_selection_changed(self):
         logger.debug('Currently selected items: %s',

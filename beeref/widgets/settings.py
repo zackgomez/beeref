@@ -15,12 +15,16 @@
 
 from functools import partial
 import logging
+import os
 
-from PyQt6 import QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
 from beeref import constants
-from beeref.config import BeeSettings, settings_events
+from beeref.config import BeeSettings, KeyboardSettings, settings_events
+from beeref.widgets.controls.keyboard import KeyboardShortcutsView
+from beeref.widgets.controls.mouse import MouseView
+from beeref.widgets.controls.mousewheel import MouseWheelView
 
 
 logger = logging.getLogger(__name__)
@@ -194,9 +198,14 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # Miscellaneous
         misc = QtWidgets.QWidget()
-        misc_layout = QtWidgets.QGridLayout()
+        misc_layout = QtWidgets.QVBoxLayout()
         misc.setLayout(misc_layout)
-        misc_layout.addWidget(ConfirmCloseUnsavedWidget(), 0, 0)
+        open_dir_btn = QtWidgets.QPushButton('Open Settings Folder')
+        open_dir_btn.clicked.connect(self.on_open_settings_dir)
+        misc_layout.addWidget(open_dir_btn)
+        misc_grid = QtWidgets.QGridLayout()
+        misc_grid.addWidget(ConfirmCloseUnsavedWidget(), 0, 0)
+        misc_layout.addLayout(misc_grid)
         tabs.addTab(misc, '&Miscellaneous')
 
         # Images & Items
@@ -208,6 +217,42 @@ class SettingsDialog(QtWidgets.QDialog):
         items_layout.addWidget(ArrangeGapWidget(), 1, 0)
         items_layout.addWidget(ArrangeDefaultWidget(), 1, 1)
         tabs.addTab(items, '&Images && Items')
+
+        # Keyboard shortcuts
+        keyboard = QtWidgets.QWidget()
+        kb_layout = QtWidgets.QVBoxLayout()
+        keyboard.setLayout(kb_layout)
+        table = KeyboardShortcutsView(keyboard)
+        search_input = QtWidgets.QLineEdit()
+        search_input.setPlaceholderText('Search...')
+        search_input.textChanged.connect(table.model().setFilterFixedString)
+        kb_layout.addWidget(search_input)
+        kb_layout.addWidget(table)
+        tabs.addTab(keyboard, '&Keyboard Shortcuts')
+
+        # Mouse controls
+        mouse = QtWidgets.QWidget()
+        mouse_layout = QtWidgets.QVBoxLayout()
+        mouse.setLayout(mouse_layout)
+        table = MouseView(mouse)
+        search_input = QtWidgets.QLineEdit()
+        search_input.setPlaceholderText('Search...')
+        search_input.textChanged.connect(table.model().setFilterFixedString)
+        mouse_layout.addWidget(search_input)
+        mouse_layout.addWidget(table)
+        tabs.addTab(mouse, '&Mouse')
+
+        # Mouse wheel controls
+        mousewheel = QtWidgets.QWidget()
+        wheel_layout = QtWidgets.QVBoxLayout()
+        mousewheel.setLayout(wheel_layout)
+        table = MouseWheelView(mousewheel)
+        search_input = QtWidgets.QLineEdit()
+        search_input.setPlaceholderText('Search...')
+        search_input.textChanged.connect(table.model().setFilterFixedString)
+        wheel_layout.addWidget(search_input)
+        wheel_layout.addWidget(table)
+        tabs.addTab(mousewheel, 'Mouse &Wheel')
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
@@ -226,6 +271,11 @@ class SettingsDialog(QtWidgets.QDialog):
         layout.addWidget(buttons)
         self.show()
 
+    def on_open_settings_dir(self):
+        dirname = os.path.dirname(BeeSettings().fileName())
+        QtGui.QDesktopServices.openUrl(
+            QtCore.QUrl.fromLocalFile(dirname))
+
     def on_restore_defaults(self, *args, **kwargs):
         reply = QtWidgets.QMessageBox.question(
             self,
@@ -234,3 +284,4 @@ class SettingsDialog(QtWidgets.QDialog):
 
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             BeeSettings().restore_defaults()
+            KeyboardSettings().restore_defaults()

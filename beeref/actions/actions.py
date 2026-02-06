@@ -56,7 +56,10 @@ class Action:
 
     def on_restore_defaults(self):
         if self.qaction:
-            self.qaction.setShortcuts(self.get_shortcuts())
+            try:
+                self.qaction.setShortcuts(self.get_shortcuts())
+            except RuntimeError:
+                pass
 
     @cached_property
     def menu_path(self):
@@ -156,7 +159,7 @@ actions = ActionList([
     ),
     Action(
         id='insert_images',
-        text='&Images...',
+        text='Load &Images...',
         shortcuts=['Ctrl+I'],
         callback='on_action_insert_images',
     ),
@@ -394,17 +397,9 @@ actions = ActionList([
         callback='on_action_debuglog',
     ),
     Action(
-        id='show_scrollbars',
-        text='Show &Scrollbars',
-        checkable=True,
-        settings='View/show_scrollbars',
-        callback='on_action_show_scrollbars',
-    ),
-    Action(
         id='show_titlebar',
         text='Show &Title Bar',
         checkable=True,
-        checked=True,
         callback='on_action_show_titlebar',
     ),
     Action(
@@ -430,15 +425,5 @@ actions = ActionList([
         id='settings',
         text='&Settings',
         callback='on_action_settings',
-    ),
-    Action(
-        id='keyboard_settings',
-        text='&Keyboard && Mouse',
-        callback='on_action_keyboard_settings',
-    ),
-    Action(
-        id='open_settings_dir',
-        text='&Open Settings Folder',
-        callback='on_action_open_settings_dir',
     ),
 ])

@@ -17,33 +17,29 @@ MENU_SEPARATOR = 0
 
 menu_structure = [
     'new_scene',
-    'open',
     {
-        'menu': 'Open &Recent',
-        'items': '_build_recent_files',
-    },
-    MENU_SEPARATOR,
-    'save',
-    'save_as',
-    MENU_SEPARATOR,
-    {
-        'menu': '&Edit',
+        'menu': '&Save',
         'items': [
-            'undo',
-            'redo',
+            'save',
+            'save_as',
             MENU_SEPARATOR,
-            'select_all',
-            'deselect_all',
-            MENU_SEPARATOR,
-            'cut',
-            'copy',
-            'paste',
-            'delete',
-            MENU_SEPARATOR,
-            'raise_to_top',
-            'lower_to_bottom',
+            'export_scene',
+            'export_images',
         ],
     },
+    {
+        'menu': '&Load',
+        'items': [
+            'open',
+            {
+                'menu': 'Open &Recent',
+                'items': '_build_recent_files',
+            },
+            MENU_SEPARATOR,
+            'insert_images',
+        ],
+    },
+    MENU_SEPARATOR,
     {
         'menu': '&View',
         'items': [
@@ -52,19 +48,10 @@ menu_structure = [
             MENU_SEPARATOR,
             'fullscreen',
             'always_on_top',
-            'show_scrollbars',
             'show_titlebar',
-            MENU_SEPARATOR,
-            'move_window',
         ],
     },
-    {
-        'menu': '&Insert',
-        'items': [
-            'insert_images',
-            'insert_text',
-        ],
-    },
+    'insert_text',
     {
         'menu': '&Transform',
         'items': [
@@ -107,21 +94,14 @@ menu_structure = [
         ],
     },
     {
-        'menu': '&Settings',
-        'items': [
-            'settings',
-            'keyboard_settings',
-            'open_settings_dir',
-        ],
-    },
-    {
-        'menu': '&Help',
+        'menu': '&Misc',
         'items': [
             'help',
             'about',
             'debuglog',
         ],
     },
+    'settings',
     MENU_SEPARATOR,
     'quit',
 ]
