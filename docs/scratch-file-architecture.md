@@ -8,15 +8,12 @@ This design introduces a scratch file (working copy) pattern — the same approa
 
 ## File naming
 
-The working copy sits next to the original with a `.swp` extension, unhidden:
-
 ```
 file.bee          — the user's file (untouched until Save)
-file.bee.swp      — working copy (always current)
-file.bee.saving   — transient copy during Save (exists only during the copy+rename)
+file.bee.swp      — working copy (always current, unhidden)
 ```
 
-Unhidden because: works the same on all platforms (no Windows hidden attribute dance), universally recognizable as a temp file, easier to find for manual recovery.
+The `.swp` extension is unhidden because: works the same on all platforms (no Windows hidden attribute dance), universally recognizable as a temp file, easier to find for manual recovery.
 
 The `.swp` file's presence on disk is the crash-recovery signal — on clean exit it's always deleted.
 
@@ -45,11 +42,19 @@ Scene is in-memory as today. Changes accumulate in the undo stack. Periodically 
 ### Save
 
 1. Final drain (flush any pending changes to working copy)
-2. Copy working copy → `file.bee.saving` (temp file)
-3. `os.replace(file.bee.saving, file.bee)` — atomic swap of the original
+2. Copy working copy → temp file in the same directory (`tempfile.NamedTemporaryFile(dir=..., delete=False)`)
+3. `os.replace(temp_file, file.bee)` — atomic swap of the original
 4. Working copy stays intact, we keep operating against it
 
-The working copy is never moved or invalidated. The original gets atomically replaced by a clean snapshot. If the copy in step 2 fails or we crash mid-copy, the original is untouched and the working copy is still valid. The `.saving` file only exists transiently — if found on startup, it's a partial write and should be deleted.
+The working copy is never moved or invalidated. The original gets atomically replaced by a clean snapshot. The temp file gets a random name (e.g., `tmpx7k2f9.bee`), so no naming collisions. If the copy in step 2 fails or we crash mid-copy, the original is untouched, the working copy is still valid, and the orphaned temp file is harmless.
+
+```python
+with tempfile.NamedTemporaryFile(
+    dir=os.path.dirname(bee_path), suffix='.bee', delete=False
+) as tmp:
+    shutil.copy2(working_copy, tmp.name)
+os.replace(tmp.name, bee_path)  # atomic (same filesystem)
+```
 
 ### Save-As
 
@@ -66,8 +71,6 @@ On open, check for `file.bee.swp`. If it exists:
 - Offer to recover: "Found unsaved changes from a previous session. Recover?"
 - Yes → open the working copy as the source instead of the original
 - No → delete the working copy, open the original normally
-
-Also delete any stale `file.bee.saving` found on startup (partial Save that didn't complete).
 
 ### Close / New Scene
 
@@ -92,7 +95,7 @@ Original .bee                Working copy (.bee.swp)
       |                       drains write metadata
       |                       new image blobs written
       |                              |
-  Save: ---copy to .saving, rename-->  original
+  Save: ---copy to tmpfile, rename-->  original
 ```
 
 The `ImageLoader` always reads from the working copy. Drains write to the working copy. No contention with the original file after the initial copy.
@@ -107,7 +110,7 @@ SQLite in WAL mode handles this cleanly — concurrent readers + one writer. Wit
 
 ## Disk cost
 
-Temporary 2x file size during operation (original + working copy), plus a brief 3x during Save (original + working copy + .saving). For a 500MB .bee file that's 500MB–1GB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean exit, and the .saving file is transient.
+Temporary 2x file size during operation (original + working copy), plus a brief 3x during Save (original + working copy + temp file). For a 500MB .bee file that's 500MB–1GB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean exit, and the .saving file is transient.
 
 ## Future: mip storage
 

@@ -17,10 +17,14 @@
 text).
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
+from collections.abc import Callable
 from functools import cached_property
 import logging
 import os.path
+from typing import Any, cast
 
 from PIL import Image
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -31,18 +35,17 @@ from beeref.config import BeeSettings
 from beeref.constants import COLORS
 from beeref.selection import SelectableMixin
 
-
 logger = logging.getLogger(__name__)
 
-item_registry = {}
+item_registry: dict[str, type[BeeItemMixin]] = {}
 
 
-def register_item(cls):
+def register_item(cls: type[BeeItemMixin]) -> type[BeeItemMixin]:
     item_registry[cls.TYPE] = cls
     return cls
 
 
-def sort_by_filename(items):
+def sort_by_filename(items: list[BeeItemMixin]) -> list[BeeItemMixin]:
     """Order items by filename.
 
     Items with a filename (ordered by filename) first, then items
@@ -51,14 +54,14 @@ def sort_by_filename(items):
     been inserted into the scene.
     """
 
-    items_by_filename = []
-    items_by_save_id = []
-    items_remaining = []
+    items_by_filename: list[BeeItemMixin] = []
+    items_by_save_id: list[BeeItemMixin] = []
+    items_remaining: list[BeeItemMixin] = []
 
     for item in items:
-        if getattr(item, 'filename', None):
+        if getattr(item, "filename", None):
             items_by_filename.append(item)
-        elif getattr(item, 'save_id', None):
+        elif getattr(item, "save_id", None):
             items_by_save_id.append(item)
         else:
             items_remaining.append(item)
@@ -71,38 +74,44 @@ def sort_by_filename(items):
 class BeeItemMixin(SelectableMixin):
     """Base for all items added by the user."""
 
-    def set_pos_center(self, pos):
+    TYPE: str
+    save_id: int | None
+    filename: str | None
+    is_image: bool
+
+    def set_pos_center(self, pos: QtCore.QPointF) -> None:
         """Sets the position using the item's center as the origin point."""
 
         self.setPos(pos - self.center_scene_coords)
 
-    def has_selection_outline(self):
+    def has_selection_outline(self) -> bool:
         return self.isSelected()
 
-    def has_selection_handles(self):
-        return (self.isSelected()
-                and self.scene()
-                and self.scene().has_single_selection())
+    def has_selection_handles(self) -> bool:
+        scene = self.bee_scene()
+        return self.isSelected() and scene is not None and scene.has_single_selection()
 
-    def selection_action_items(self):
-        """The items affected by selection actions like scaling and rotating.
-        """
+    def selection_action_items(self) -> list[Any]:
+        """The items affected by selection actions like scaling and rotating."""
         return [self]
 
-    def on_selected_change(self, value):
-        if (value and self.scene()
-                and not self.scene().has_selection()
-                and self.scene().active_mode is not None):
+    def on_selected_change(self, value: Any) -> None:
+        scene = self.bee_scene()
+        if (
+            value
+            and scene
+            and not scene.has_selection()
+            and scene.active_mode is not None
+        ):
             self.bring_to_front()
 
-    def update_from_data(self, **kwargs):
-        self.save_id = kwargs.get('save_id', self.save_id)
-        self.setPos(kwargs.get('x', self.pos().x()),
-                    kwargs.get('y', self.pos().y()))
-        self.setZValue(kwargs.get('z', self.zValue()))
-        self.setScale(kwargs.get('scale', self.scale()))
-        self.setRotation(kwargs.get('rotation', self.rotation()))
-        if kwargs.get('flip', 1) != self.flip():
+    def update_from_data(self, **kwargs: Any) -> None:
+        self.save_id = kwargs.get("save_id", self.save_id)
+        self.setPos(kwargs.get("x", self.pos().x()), kwargs.get("y", self.pos().y()))
+        self.setZValue(kwargs.get("z", self.zValue()))
+        self.setScale(kwargs.get("scale", self.scale()))
+        self.setRotation(kwargs.get("rotation", self.rotation()))
+        if kwargs.get("flip", 1) != self.flip():
             self.do_flip()
 
 
@@ -110,98 +119,110 @@ class BeeItemMixin(SelectableMixin):
 class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
     """Class for images added by the user."""
 
-    TYPE = 'pixmap'
-    CROP_HANDLE_SIZE = 15
+    TYPE = "pixmap"
+    CROP_HANDLE_SIZE: int = 15
 
-    MIP_MIN_DIM = 128
+    MIP_MIN_DIM: int = 128
 
-    def __init__(self, image, filename=None, **kwargs):
+    crop_temp: QtCore.QRectF | None
+    crop_mode_move: Callable[[], QtCore.QRectF] | None
+    crop_mode_event_start: QtCore.QPointF | None
+
+    def __init__(
+        self, image: QtGui.QImage, filename: str | None = None, **kwargs: Any
+    ) -> None:
         super().__init__(QtGui.QPixmap.fromImage(image))
-        self.save_id = None
+        self.save_id: int | None = None
         self.filename = filename
         self.reset_crop()
-        self._mip_chain = []
+        self._mip_chain: list[tuple[QtGui.QPixmap, float]] = []
         self._generate_mips()
-        logger.debug(f'Initialized {self}')
+        logger.debug(f"Initialized {self}")
         self.is_image = True
-        self.crop_mode = False
+        self.crop_mode: bool = False
         self.init_selectable()
         self.settings = BeeSettings()
 
     @classmethod
-    def create_from_data(self, **kwargs):
-        item = kwargs.pop('item')
-        data = kwargs.pop('data', {})
-        item.filename = item.filename or data.get('filename')
-        if 'crop' in data:
-            item.crop = QtCore.QRectF(*data['crop'])
-        item.setOpacity(data.get('opacity', 1))
+    def create_from_data(cls, **kwargs: Any) -> BeePixmapItem:
+        item: BeePixmapItem = kwargs.pop("item")
+        data: dict[str, Any] = kwargs.pop("data", {})
+        item.filename = item.filename or data.get("filename")
+        if "crop" in data:
+            item.crop = QtCore.QRectF(*data["crop"])
+        item.setOpacity(data.get("opacity", 1))
         return item
 
-    def __str__(self):
+    def __str__(self) -> str:
         size = self.pixmap().size()
-        return (f'Image "{self.filename}" {size.width()} x {size.height()}')
+        return f'Image "{self.filename}" {size.width()} x {size.height()}'
 
     @property
-    def crop(self):
+    def crop(self) -> QtCore.QRectF:
         return self._crop
 
     @crop.setter
-    def crop(self, value):
-        logger.debug(f'Setting crop for {self} to {value}')
+    def crop(self, value: QtCore.QRectF) -> None:
+        logger.debug(f"Setting crop for {self} to {value}")
         self.prepareGeometryChange()
         self._crop = value
         self.update()
 
-    def sample_color_at(self, pos):
+    def sample_color_at(self, pos: QtCore.QPointF) -> QtGui.QColor | None:
         ipos = self.mapFromScene(pos)
         img = self.pixmap().toImage()
 
         color = img.pixelColor(int(ipos.x()), int(ipos.y()))
         if color.alpha():
             return color
+        return None
 
-    def bounding_rect_unselected(self):
+    def bounding_rect_unselected(self) -> QtCore.QRectF:
         if self.crop_mode:
             return QtWidgets.QGraphicsPixmapItem.boundingRect(self)
         else:
             return self.crop
 
-    def get_extra_save_data(self):
-        return {'filename': self.filename,
-                'opacity': self.opacity(),
-                'crop': [self.crop.topLeft().x(),
-                         self.crop.topLeft().y(),
-                         self.crop.width(),
-                         self.crop.height()]}
+    def get_extra_save_data(self) -> dict[str, Any]:
+        return {
+            "filename": self.filename,
+            "opacity": self.opacity(),
+            "crop": [
+                self.crop.topLeft().x(),
+                self.crop.topLeft().y(),
+                self.crop.width(),
+                self.crop.height(),
+            ],
+        }
 
-    def get_filename_for_export(self, imgformat, save_id_default=None):
+    def get_filename_for_export(
+        self, imgformat: str, save_id_default: int | None = None
+    ) -> str:
         save_id = self.save_id or save_id_default
         assert save_id is not None
 
         if self.filename:
             basename = os.path.splitext(os.path.basename(self.filename))[0]
-            return f'{save_id:04}-{basename}.{imgformat}'
+            return f"{save_id:04}-{basename}.{imgformat}"
         else:
-            return f'{save_id:04}.{imgformat}'
+            return f"{save_id:04}.{imgformat}"
 
-    def get_imgformat(self, img):
+    def get_imgformat(self, img: QtGui.QImage) -> str:
         """Determines the format for storing this image."""
 
-        formt = self.settings.valueOrDefault('Items/image_storage_format')
+        formt = self.settings.valueOrDefault("Items/image_storage_format")
 
-        if formt == 'best':
+        if formt == "best":
             # Images with alpha channel and small images are stored as png
-            if (img.hasAlphaChannel()
-                    or (img.height() < 500 and img.width() < 500)):
-                formt = 'png'
+            if img.hasAlphaChannel() or (img.height() < 500 and img.width() < 500):
+                formt = "png"
             else:
-                formt = 'jpg'
+                formt = "jpg"
 
-        logger.debug(f'Found format {formt} for {self}')
+        logger.debug(f"Found format {formt} for {self}")
         return formt
 
-    def pixmap_to_bytes(self, apply_crop=False):
+    def pixmap_to_bytes(self, apply_crop: bool = False) -> tuple[bytes, str]:
         """Convert the pixmap data to PNG bytestring."""
         barray = QtCore.QByteArray()
         buffer = QtCore.QBuffer(barray)
@@ -216,23 +237,31 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         img.save(buffer, imgformat.upper(), quality=90)
         return (barray.data(), imgformat)
 
-    def _qpixmap_to_pil(self, pixmap):
+    def _qpixmap_to_pil(self, pixmap: QtGui.QPixmap) -> Image.Image:
         """Convert a QPixmap to a PIL Image."""
         img = pixmap.toImage()
         if img.hasAlphaChannel():
             img = img.convertToFormat(QtGui.QImage.Format.Format_RGBA8888)
-            mode = 'RGBA'
+            mode = "RGBA"
         else:
             img = img.convertToFormat(QtGui.QImage.Format.Format_RGB888)
-            mode = 'RGB'
+            mode = "RGB"
         ptr = img.constBits()
+        assert ptr is not None
         ptr.setsize(img.sizeInBytes())
-        return Image.frombytes(mode, (img.width(), img.height()),
-                               bytes(ptr), 'raw', mode, img.bytesPerLine())
+        raw_bytes: bytes = bytes(cast(Any, ptr))
+        return Image.frombytes(
+            mode,
+            (img.width(), img.height()),
+            raw_bytes,
+            "raw",
+            mode,
+            img.bytesPerLine(),
+        )
 
-    def _pil_to_qpixmap(self, pil_img):
+    def _pil_to_qpixmap(self, pil_img: Image.Image) -> QtGui.QPixmap:
         """Convert a PIL Image to a QPixmap."""
-        if pil_img.mode == 'RGBA':
+        if pil_img.mode == "RGBA":
             fmt = QtGui.QImage.Format.Format_RGBA8888
             channels = 4
         else:
@@ -243,7 +272,7 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         qimg = QtGui.QImage(data, pil_img.width, pil_img.height, stride, fmt)
         return QtGui.QPixmap.fromImage(qimg.copy())
 
-    def _generate_mips(self):
+    def _generate_mips(self) -> None:
         """Pre-compute half-res mip levels using Pillow LANCZOS."""
         pm = self.pixmap()
         if pm.isNull() or min(pm.width(), pm.height()) < self.MIP_MIN_DIM * 2:
@@ -263,18 +292,18 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             self._mip_chain.append((self._pil_to_qpixmap(mip), scale))
             level += 1
 
-    def setPixmap(self, pixmap):
+    def setPixmap(self, pixmap: QtGui.QPixmap) -> None:
         super().setPixmap(pixmap)
         self.reset_crop()
         self._generate_mips()
 
-    def pixmap_from_bytes(self, data):
+    def pixmap_from_bytes(self, data: bytes) -> None:
         """Set image pimap from a bytestring."""
         pixmap = QtGui.QPixmap()
         pixmap.loadFromData(data)
         self.setPixmap(pixmap)
 
-    def create_copy(self):
+    def create_copy(self) -> BeePixmapItem:
         item = BeePixmapItem(QtGui.QImage(), self.filename)
         item.setPixmap(self.pixmap())
         item.setPos(self.pos())
@@ -288,13 +317,13 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         return item
 
     @cached_property
-    def color_gamut(self):
-        logger.debug(f'Calculating color gamut for {self}')
+    def color_gamut(self) -> defaultdict[tuple[int, int], int]:
+        logger.debug(f"Calculating color gamut for {self}")
         gamut = defaultdict(int)
         img = self.pixmap().toImage()
         # Don't evaluate every pixel for larger images:
         step = max(1, int(max(img.width(), img.height()) / 1000))
-        logger.debug(f'Considering every {step}. row/column')
+        logger.debug(f"Considering every {step}. row/column")
 
         # Not actually faster than solution below :(
         # ptr = img.bits()
@@ -313,123 +342,156 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             for j in range(0, img.height(), step):
                 rgb = img.pixelColor(i, j)
                 rgbtuple = (rgb.red(), rgb.blue(), rgb.green())
-                if (5 < rgb.alpha()
-                        and min(rgbtuple) < 250 and max(rgbtuple) > 5):
+                if 5 < rgb.alpha() and min(rgbtuple) < 250 and max(rgbtuple) > 5:
                     # Only consider pixels that aren't close to
                     # transparent, white or black
                     gamut[rgb.hue(), rgb.saturation()] += 1
 
-        logger.debug(f'Got {len(gamut)} color gamut values')
+        logger.debug(f"Got {len(gamut)} color gamut values")
         return gamut
 
-    def copy_to_clipboard(self, clipboard):
+    def copy_to_clipboard(self, clipboard: QtGui.QClipboard) -> None:
         clipboard.setPixmap(self.pixmap())
 
-    def reset_crop(self):
+    def reset_crop(self) -> None:
         self.crop = QtCore.QRectF(
-            0, 0, self.pixmap().size().width(), self.pixmap().size().height())
+            0, 0, self.pixmap().size().width(), self.pixmap().size().height()
+        )
 
     @property
-    def crop_handle_size(self):
+    def crop_handle_size(self) -> float:
         return self.fixed_length_for_viewport(self.CROP_HANDLE_SIZE)
 
-    def crop_handle_topleft(self):
+    def crop_handle_topleft(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         topleft = self.crop_temp.topLeft()
         return QtCore.QRectF(
-            topleft.x(),
-            topleft.y(),
-            self.crop_handle_size,
-            self.crop_handle_size)
+            topleft.x(), topleft.y(), self.crop_handle_size, self.crop_handle_size
+        )
 
-    def crop_handle_bottomleft(self):
+    def crop_handle_bottomleft(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         bottomleft = self.crop_temp.bottomLeft()
         return QtCore.QRectF(
             bottomleft.x(),
             bottomleft.y() - self.crop_handle_size,
             self.crop_handle_size,
-            self.crop_handle_size)
+            self.crop_handle_size,
+        )
 
-    def crop_handle_bottomright(self):
+    def crop_handle_bottomright(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         bottomright = self.crop_temp.bottomRight()
         return QtCore.QRectF(
             bottomright.x() - self.crop_handle_size,
             bottomright.y() - self.crop_handle_size,
             self.crop_handle_size,
-            self.crop_handle_size)
+            self.crop_handle_size,
+        )
 
-    def crop_handle_topright(self):
+    def crop_handle_topright(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         topright = self.crop_temp.topRight()
         return QtCore.QRectF(
             topright.x() - self.crop_handle_size,
             topright.y(),
             self.crop_handle_size,
-            self.crop_handle_size)
+            self.crop_handle_size,
+        )
 
-    def crop_handles(self):
-        return (self.crop_handle_topleft,
-                self.crop_handle_bottomleft,
-                self.crop_handle_bottomright,
-                self.crop_handle_topright)
+    def crop_handles(
+        self,
+    ) -> tuple[
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+    ]:
+        return (
+            self.crop_handle_topleft,
+            self.crop_handle_bottomleft,
+            self.crop_handle_bottomright,
+            self.crop_handle_topright,
+        )
 
-    def crop_edge_top(self):
+    def crop_edge_top(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         topleft = self.crop_temp.topLeft()
         return QtCore.QRectF(
             topleft.x() + self.crop_handle_size,
             topleft.y(),
             self.crop_temp.width() - 2 * self.crop_handle_size,
-            self.crop_handle_size)
+            self.crop_handle_size,
+        )
 
-    def crop_edge_left(self):
+    def crop_edge_left(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         topleft = self.crop_temp.topLeft()
         return QtCore.QRectF(
             topleft.x(),
             topleft.y() + self.crop_handle_size,
             self.crop_handle_size,
-            self.crop_temp.height() - 2 * self.crop_handle_size)
+            self.crop_temp.height() - 2 * self.crop_handle_size,
+        )
 
-    def crop_edge_bottom(self):
+    def crop_edge_bottom(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         bottomleft = self.crop_temp.bottomLeft()
         return QtCore.QRectF(
             bottomleft.x() + self.crop_handle_size,
             bottomleft.y() - self.crop_handle_size,
             self.crop_temp.width() - 2 * self.crop_handle_size,
-            self.crop_handle_size)
+            self.crop_handle_size,
+        )
 
-    def crop_edge_right(self):
+    def crop_edge_right(self) -> QtCore.QRectF:
+        assert self.crop_temp is not None
         topright = self.crop_temp.topRight()
         return QtCore.QRectF(
             topright.x() - self.crop_handle_size,
             topright.y() + self.crop_handle_size,
             self.crop_handle_size,
-            self.crop_temp.height() - 2 * self.crop_handle_size)
+            self.crop_temp.height() - 2 * self.crop_handle_size,
+        )
 
-    def crop_edges(self):
-        return (self.crop_edge_top,
-                self.crop_edge_left,
-                self.crop_edge_bottom,
-                self.crop_edge_right)
+    def crop_edges(
+        self,
+    ) -> tuple[
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+        Callable[[], QtCore.QRectF],
+    ]:
+        return (
+            self.crop_edge_top,
+            self.crop_edge_left,
+            self.crop_edge_bottom,
+            self.crop_edge_right,
+        )
 
-    def get_crop_handle_cursor(self, handle):
+    def get_crop_handle_cursor(
+        self, handle: Callable[[], QtCore.QRectF]
+    ) -> Qt.CursorShape:
         """Gets the crop cursor for the given handle."""
 
         is_topleft_or_bottomright = handle in (
-            self.crop_handle_topleft, self.crop_handle_bottomright)
+            self.crop_handle_topleft,
+            self.crop_handle_bottomright,
+        )
         return self.get_diag_cursor(is_topleft_or_bottomright)
 
-    def get_crop_edge_cursor(self, edge):
+    def get_crop_edge_cursor(self, edge: Callable[[], QtCore.QRectF]) -> Qt.CursorShape:
         """Gets the crop edge cursor for the given edge."""
 
-        top_or_bottom = edge in (
-            self.crop_edge_top, self.crop_edge_bottom)
-        sideways = (45 < self.rotation() < 135
-                    or 225 < self.rotation() < 315)
+        top_or_bottom = edge in (self.crop_edge_top, self.crop_edge_bottom)
+        sideways = 45 < self.rotation() < 135 or 225 < self.rotation() < 315
 
         if top_or_bottom is sideways:
             return Qt.CursorShape.SizeHorCursor
         else:
             return Qt.CursorShape.SizeVerCursor
 
-    def draw_crop_rect(self, painter, rect):
+    def draw_crop_rect(self, painter: QtGui.QPainter, rect: QtCore.QRectF) -> None:
         """Paint a dotted rectangle for the cropping UI."""
         pen = QtGui.QPen(QtGui.QColor(255, 255, 255))
         pen.setWidth(2)
@@ -441,10 +503,12 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         painter.setPen(pen)
         painter.drawRect(rect)
 
-    def _get_mip(self, effective_scale):
+    def _get_mip(
+        self, effective_scale: float
+    ) -> tuple[QtGui.QPixmap | None, float | None]:
         """Pick the coarsest mip level that won't require upscaling."""
-        pm = None
-        mip_scale = None
+        pm: QtGui.QPixmap | None = None
+        mip_scale: float | None = None
         for mip_pm, ms in self._mip_chain:
             if ms <= effective_scale:
                 break
@@ -452,7 +516,13 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             mip_scale = ms
         return pm, mip_scale
 
-    def paint(self, painter, option, widget):
+    def paint(
+        self,
+        painter: QtGui.QPainter | None,
+        option: QtWidgets.QStyleOptionGraphicsItem | None,
+        widget: QtWidgets.QWidget | None = None,
+    ) -> None:
+        assert painter is not None
         effective_scale = abs(painter.combinedTransform().m11())
 
         if effective_scale < 2:
@@ -462,6 +532,7 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             painter.setRenderHint(painter.RenderHint.SmoothPixmapTransform)
 
         if self.crop_mode:
+            assert self.crop_temp is not None
             self.paint_debug(painter, option, widget)
 
             # Darken image outside of cropped area
@@ -482,36 +553,37 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             pm = self.pixmap()
             source_crop = self.crop
 
-            if (effective_scale < 0.8
-                    and self._mip_chain):
+            if effective_scale < 0.8 and self._mip_chain:
                 mip_pm, mip_scale = self._get_mip(effective_scale)
                 if mip_pm is not None:
+                    assert mip_scale is not None
                     pm = mip_pm
                     source_crop = QtCore.QRectF(
                         self.crop.x() * mip_scale,
                         self.crop.y() * mip_scale,
                         self.crop.width() * mip_scale,
-                        self.crop.height() * mip_scale)
+                        self.crop.height() * mip_scale,
+                    )
 
             painter.drawPixmap(self.crop, pm, source_crop)
             self.paint_selectable(painter, option, widget)
 
-    def enter_crop_mode(self):
-        logger.debug(f'Entering crop mode on {self}')
+    def enter_crop_mode(self) -> None:
+        logger.debug(f"Entering crop mode on {self}")
         self.prepareGeometryChange()
         self.crop_mode = True
         self.crop_temp = QtCore.QRectF(self.crop)
-        self.crop_mode_move = None
-        self.crop_mode_event_start = None
+        self.crop_mode_move: Callable[[], QtCore.QRectF] | None = None
+        self.crop_mode_event_start: QtCore.QPointF | None = None
         self.grabKeyboard()
         self.update()
-        self.scene().crop_item = self
+        self.require_scene().crop_item = self
 
-    def exit_crop_mode(self, confirm):
-        logger.debug(f'Exiting crop mode with {confirm} on {self}')
+    def exit_crop_mode(self, confirm: bool) -> None:
+        logger.debug(f"Exiting crop mode with {confirm} on {self}")
+        scene = self.require_scene()
         if confirm and self.crop != self.crop_temp:
-            self.scene().undo_stack.push(
-                commands.CropItem(self, self.crop_temp))
+            scene.undo_stack.push(commands.CropItem(self, self.crop_temp))
         self.prepareGeometryChange()
         self.crop_mode = False
         self.crop_temp = None
@@ -519,9 +591,10 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         self.crop_mode_event_start = None
         self.ungrabKeyboard()
         self.update()
-        self.scene().crop_item = None
+        scene.crop_item = None
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QtGui.QKeyEvent | None) -> None:
+        assert event is not None
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.exit_crop_mode(confirm=True)
         elif event.key() == Qt.Key.Key_Escape:
@@ -529,7 +602,8 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         else:
             super().keyPressEvent(event)
 
-    def hoverMoveEvent(self, event):
+    def hoverMoveEvent(self, event: QtWidgets.QGraphicsSceneHoverEvent | None) -> None:
+        assert event is not None
         if not self.crop_mode:
             return super().hoverMoveEvent(event)
 
@@ -543,7 +617,8 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
                 return
         self.unset_cursor()
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent | None) -> None:
+        assert event is not None
         if not self.crop_mode:
             return super().mousePressEvent(event)
 
@@ -561,11 +636,14 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
                 self.crop_mode_move = edge
                 return
         # Click not in handle, end cropping mode:
-        self.exit_crop_mode(
-            confirm=self.crop_temp.contains(event.pos()))
+        assert self.crop_temp is not None
+        self.exit_crop_mode(confirm=self.crop_temp.contains(event.pos()))
 
-    def ensure_point_within_crop_bounds(self, point, handle):
+    def ensure_point_within_crop_bounds(
+        self, point: QtCore.QPointF, handle: Callable[[], QtCore.QRectF]
+    ) -> QtCore.QPointF:
         """Returns the point, or the nearest point within the pixmap."""
+        assert self.crop_temp is not None
 
         if handle == self.crop_handle_topleft:
             topleft = QtCore.QPointF(0, 0)
@@ -573,71 +651,88 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         if handle == self.crop_handle_bottomleft:
             topleft = QtCore.QPointF(0, self.crop_temp.top())
             bottomright = QtCore.QPointF(
-                self.crop_temp.right(), self.pixmap().size().height())
+                self.crop_temp.right(), self.pixmap().size().height()
+            )
         if handle == self.crop_handle_bottomright:
             topleft = self.crop_temp.topLeft()
             bottomright = QtCore.QPointF(
-                self.pixmap().size().width(), self.pixmap().size().height())
+                self.pixmap().size().width(), self.pixmap().size().height()
+            )
         if handle == self.crop_handle_topright:
             topleft = QtCore.QPointF(self.crop_temp.left(), 0)
             bottomright = QtCore.QPointF(
-                self.pixmap().size().width(), self.crop_temp.bottom())
+                self.pixmap().size().width(), self.crop_temp.bottom()
+            )
         if handle == self.crop_edge_top:
             topleft = QtCore.QPointF(0, 0)
             bottomright = QtCore.QPointF(
-                self.pixmap().size().width(), self.crop_temp.bottom())
+                self.pixmap().size().width(), self.crop_temp.bottom()
+            )
         if handle == self.crop_edge_bottom:
             topleft = QtCore.QPointF(0, self.crop_temp.top())
             bottomright = QtCore.QPointF(
-                self.pixmap().size().width(), self.pixmap().size().height())
+                self.pixmap().size().width(), self.pixmap().size().height()
+            )
         if handle == self.crop_edge_left:
             topleft = QtCore.QPointF(0, 0)
             bottomright = QtCore.QPointF(
-                self.crop_temp.right(), self.pixmap().size().height())
+                self.crop_temp.right(), self.pixmap().size().height()
+            )
         if handle == self.crop_edge_right:
             topleft = QtCore.QPointF(self.crop_temp.left(), 0)
             bottomright = QtCore.QPointF(
-                self.pixmap().size().width(), self.pixmap().size().height())
+                self.pixmap().size().width(), self.pixmap().size().height()
+            )
 
         point.setX(min(bottomright.x(), max(topleft.x(), point.x())))
         point.setY(min(bottomright.y(), max(topleft.y(), point.y())))
 
         return point
 
-    def mouseMoveEvent(self, event):
-        if self.crop_mode and self.crop_mode_event_start:
+    def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent | None) -> None:
+        assert event is not None
+        if self.crop_mode and self.crop_mode_event_start is not None:
+            assert self.crop_temp is not None
             diff = event.pos() - self.crop_mode_event_start
             if self.crop_mode_move == self.crop_handle_topleft:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.topLeft() + diff, self.crop_mode_move)
+                    self.crop_temp.topLeft() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setTopLeft(new)
             if self.crop_mode_move == self.crop_handle_bottomleft:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.bottomLeft() + diff, self.crop_mode_move)
+                    self.crop_temp.bottomLeft() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setBottomLeft(new)
             if self.crop_mode_move == self.crop_handle_bottomright:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.bottomRight() + diff, self.crop_mode_move)
+                    self.crop_temp.bottomRight() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setBottomRight(new)
             if self.crop_mode_move == self.crop_handle_topright:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.topRight() + diff, self.crop_mode_move)
+                    self.crop_temp.topRight() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setTopRight(new)
             if self.crop_mode_move == self.crop_edge_top:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.topLeft() + diff, self.crop_mode_move)
+                    self.crop_temp.topLeft() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setTop(new.y())
             if self.crop_mode_move == self.crop_edge_left:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.topLeft() + diff, self.crop_mode_move)
+                    self.crop_temp.topLeft() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setLeft(new.x())
             if self.crop_mode_move == self.crop_edge_bottom:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.bottomLeft() + diff, self.crop_mode_move)
+                    self.crop_temp.bottomLeft() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setBottom(new.y())
             if self.crop_mode_move == self.crop_edge_right:
                 new = self.ensure_point_within_crop_bounds(
-                    self.crop_temp.topRight() + diff, self.crop_mode_move)
+                    self.crop_temp.topRight() + diff, self.crop_mode_move
+                )
                 self.crop_temp.setRight(new.x())
             self.update()
             self.crop_mode_event_start = event.pos()
@@ -645,7 +740,10 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         else:
             super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(
+        self, event: QtWidgets.QGraphicsSceneMouseEvent | None
+    ) -> None:
+        assert event is not None
         if self.crop_mode:
             self.crop_mode_move = None
             self.crop_mode_event_start = None
@@ -658,7 +756,7 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
 class BeeTextItem(BeeItemMixin, QtWidgets.QGraphicsTextItem):
     """Class for markdown text added by the user."""
 
-    TYPE = 'text'
+    TYPE = "text"
 
     STYLESHEET = """
         body { color: %s; }
@@ -668,58 +766,66 @@ class BeeTextItem(BeeItemMixin, QtWidgets.QGraphicsTextItem):
         a { color: #6aeae7; }
     """
 
-    def __init__(self, text=None, **kwargs):
+    def __init__(self, text: str | None = None, **kwargs: Any) -> None:
         super().__init__()
-        self.save_id = None
+        self.save_id: int | None = None
         self.is_image = False
         self.init_selectable()
         self.is_editable = True
-        self.edit_mode = False
-        self._markdown = text or "Text"
+        self.edit_mode: bool = False
+        self._markdown: str = text or "Text"
         self._render_markdown()
-        logger.debug(f'Initialized {self}')
+        logger.debug(f"Initialized {self}")
 
-    def _render_markdown(self):
+    def _render_markdown(self) -> None:
         """Render stored markdown to HTML for display."""
         import mistune
-        text_color = 'rgb(%d,%d,%d)' % COLORS['Scene:Text']
+
+        text_color = "rgb(%d,%d,%d)" % COLORS["Scene:Text"]
         css = self.STYLESHEET % text_color
         html = mistune.html(self._markdown)
-        self.setHtml(f'<style>{css}</style>{html}')
+        self.setHtml(f"<style>{css}</style>{html}")
 
-    def set_markdown(self, text):
+    def set_markdown(self, text: str) -> None:
         """Set markdown source and re-render."""
         self._markdown = text
         self._render_markdown()
 
     @classmethod
-    def create_from_data(cls, **kwargs):
-        data = kwargs.get('data', {})
+    def create_from_data(cls, **kwargs: Any) -> BeeTextItem:
+        data: dict[str, Any] = kwargs.get("data", {})
         item = cls(**data)
         return item
 
-    def __str__(self):
+    def __str__(self) -> str:
         txt = self._markdown[:40]
-        return (f'Text "{txt}"')
+        return f'Text "{txt}"'
 
-    def get_extra_save_data(self):
-        return {'text': self._markdown}
+    def get_extra_save_data(self) -> dict[str, Any]:
+        return {"text": self._markdown}
 
-    def contains(self, point):
+    def contains(self, point: QtCore.QPointF) -> bool:
         return self.boundingRect().contains(point)
 
-    def paint(self, painter, option, widget):
+    def paint(
+        self,
+        painter: QtGui.QPainter | None,
+        option: QtWidgets.QStyleOptionGraphicsItem | None,
+        widget: QtWidgets.QWidget | None = None,
+    ) -> None:
+        assert painter is not None
         painter.setPen(Qt.PenStyle.NoPen)
         color = QtGui.QColor(0, 0, 0)
         color.setAlpha(40)
         brush = QtGui.QBrush(color)
         painter.setBrush(brush)
         painter.drawRect(QtWidgets.QGraphicsTextItem.boundingRect(self))
-        option.state = QtWidgets.QStyle.StateFlag.State_Enabled
+        if option is not None:
+            option.state = QtWidgets.QStyle.StateFlag.State_Enabled
         super().paint(painter, option, widget)
         self.paint_selectable(painter, option, widget)
 
-    def create_copy(self):
+    def create_copy(self) -> BeeTextItem:
         item = BeeTextItem(self._markdown)
         item.setPos(self.pos())
         item.setZValue(self.zValue())
@@ -729,54 +835,57 @@ class BeeTextItem(BeeItemMixin, QtWidgets.QGraphicsTextItem):
             item.do_flip()
         return item
 
-    def enter_edit_mode(self):
-        logger.debug(f'Entering edit mode on {self}')
+    def enter_edit_mode(self) -> None:
+        logger.debug(f"Entering edit mode on {self}")
         self.edit_mode = True
         self.old_text = self._markdown
         self.setPlainText(self._markdown)
-        self.setDefaultTextColor(QtGui.QColor(*COLORS['Scene:Text']))
-        self.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextEditorInteraction)
-        self.scene().edit_item = self
+        self.setDefaultTextColor(QtGui.QColor(*COLORS["Scene:Text"]))
+        self.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
+        self.require_scene().edit_item = self
 
-    def exit_edit_mode(self, commit=True):
-        logger.debug(f'Exiting edit mode on {self}')
+    def exit_edit_mode(self, commit: bool = True) -> None:
+        logger.debug(f"Exiting edit mode on {self}")
         self.edit_mode = False
         # reset selection:
         self.setTextCursor(QtGui.QTextCursor(self.document()))
         self.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
-        self.scene().edit_item = None
+        scene = self.require_scene()
+        scene.edit_item = None
         if commit:
             new_text = self.toPlainText()
             self._markdown = new_text
             self._render_markdown()
-            self.scene().undo_stack.push(
-                commands.ChangeText(self, new_text, self.old_text))
+            scene.undo_stack.push(commands.ChangeText(self, new_text, self.old_text))
             if not new_text.strip():
-                logger.debug('Removing empty text item')
-                self.scene().undo_stack.push(
-                    commands.DeleteItems(self.scene(), [self]))
+                logger.debug("Removing empty text item")
+                scene.undo_stack.push(commands.DeleteItems(scene, [self]))
         else:
             self._markdown = self.old_text
             self._render_markdown()
 
-    def has_selection_handles(self):
+    def has_selection_handles(self) -> bool:
         return super().has_selection_handles() and not self.edit_mode
 
-    def keyPressEvent(self, event):
-        if (event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return)
-                and event.modifiers() == Qt.KeyboardModifier.ShiftModifier):
+    def keyPressEvent(self, event: QtGui.QKeyEvent | None) -> None:
+        assert event is not None
+        if (
+            event.key() in (Qt.Key.Key_Enter, Qt.Key.Key_Return)
+            and event.modifiers() == Qt.KeyboardModifier.ShiftModifier
+        ):
             self.exit_edit_mode()
             event.accept()
             return
-        if (event.key() == Qt.Key.Key_Escape
-                and event.modifiers() == Qt.KeyboardModifier.NoModifier):
+        if (
+            event.key() == Qt.Key.Key_Escape
+            and event.modifiers() == Qt.KeyboardModifier.NoModifier
+        ):
             self.exit_edit_mode(commit=False)
             event.accept()
             return
         super().keyPressEvent(event)
 
-    def copy_to_clipboard(self, clipboard):
+    def copy_to_clipboard(self, clipboard: QtGui.QClipboard) -> None:
         clipboard.setText(self._markdown)
 
 
@@ -791,49 +900,55 @@ class BeeErrorItem(BeeItemMixin, QtWidgets.QGraphicsTextItem):
     is saved.
     """
 
-    TYPE = 'error'
+    TYPE = "error"
 
-    def __init__(self, text=None, **kwargs):
+    def __init__(self, text: str | None = None, **kwargs: Any) -> None:
         super().__init__(text or "Text")
-        self.original_save_id = None
-        logger.debug(f'Initialized {self}')
+        self.original_save_id: int | None = None
+        logger.debug(f"Initialized {self}")
         self.is_image = False
         self.init_selectable()
         self.is_editable = False
-        self.setDefaultTextColor(QtGui.QColor(*COLORS['Scene:Text']))
+        self.setDefaultTextColor(QtGui.QColor(*COLORS["Scene:Text"]))
 
     @classmethod
-    def create_from_data(cls, **kwargs):
-        data = kwargs.get('data', {})
+    def create_from_data(cls, **kwargs: Any) -> BeeErrorItem:
+        data: dict[str, Any] = kwargs.get("data", {})
         item = cls(**data)
         return item
 
-    def __str__(self):
+    def __str__(self) -> str:
         txt = self.toPlainText()[:40]
-        return (f'Error "{txt}"')
+        return f'Error "{txt}"'
 
-    def contains(self, point):
+    def contains(self, point: QtCore.QPointF) -> bool:
         return self.boundingRect().contains(point)
 
-    def paint(self, painter, option, widget):
+    def paint(
+        self,
+        painter: QtGui.QPainter | None,
+        option: QtWidgets.QStyleOptionGraphicsItem | None,
+        widget: QtWidgets.QWidget | None = None,
+    ) -> None:
+        assert painter is not None
         painter.setPen(Qt.PenStyle.NoPen)
         color = QtGui.QColor(200, 0, 0)
         brush = QtGui.QBrush(color)
         painter.setBrush(brush)
         painter.drawRect(QtWidgets.QGraphicsTextItem.boundingRect(self))
-        option.state = QtWidgets.QStyle.StateFlag.State_Enabled
+        if option is not None:
+            option.state = QtWidgets.QStyle.StateFlag.State_Enabled
         super().paint(painter, option, widget)
         self.paint_selectable(painter, option, widget)
 
-    def update_from_data(self, **kwargs):
-        self.original_save_id = kwargs.get('save_id', self.original_save_id)
-        self.setPos(kwargs.get('x', self.pos().x()),
-                    kwargs.get('y', self.pos().y()))
-        self.setZValue(kwargs.get('z', self.zValue()))
-        self.setScale(kwargs.get('scale', self.scale()))
-        self.setRotation(kwargs.get('rotation', self.rotation()))
+    def update_from_data(self, **kwargs: Any) -> None:
+        self.original_save_id = kwargs.get("save_id", self.original_save_id)
+        self.setPos(kwargs.get("x", self.pos().x()), kwargs.get("y", self.pos().y()))
+        self.setZValue(kwargs.get("z", self.zValue()))
+        self.setScale(kwargs.get("scale", self.scale()))
+        self.setRotation(kwargs.get("rotation", self.rotation()))
 
-    def create_copy(self):
+    def create_copy(self) -> BeeErrorItem:
         item = BeeErrorItem(self.toPlainText())
         item.setPos(self.pos())
         item.setZValue(self.zValue())
@@ -841,15 +956,15 @@ class BeeErrorItem(BeeItemMixin, QtWidgets.QGraphicsTextItem):
         item.setRotation(self.rotation())
         return item
 
-    def flip(self, *args, **kwargs):
+    def flip(self, *args: Any, **kwargs: Any) -> float:
         """Returns the flip value (1 or -1)"""
         # Never display error messages flipped
         return 1
 
-    def do_flip(self, *args, **kwargs):
+    def do_flip(self, *args: Any, **kwargs: Any) -> None:
         """Flips the item."""
         # Never flip error messages
         pass
 
-    def copy_to_clipboard(self, clipboard):
+    def copy_to_clipboard(self, clipboard: QtGui.QClipboard) -> None:
         clipboard.setText(self.toPlainText())
