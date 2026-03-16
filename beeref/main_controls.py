@@ -73,31 +73,22 @@ class MainControlsMixin(_MainControlsBase):
         else:
             self.enter_movewin_mode()
 
-    @property
-    def viewport_or_self(self) -> QtWidgets.QWidget:
-        viewport_fn = getattr(self, "viewport", None)
-        if viewport_fn is not None:
-            return viewport_fn()
-        return self
-
     def enter_movewin_mode(self) -> None:
         logger.debug("Entering movewin mode")
         self.setMouseTracking(True)
         self.movewin_active = True
-        self.viewport_or_self.setCursor(Qt.CursorShape.SizeAllCursor)
+        vp = self.viewport()
+        assert vp is not None
+        vp.setCursor(Qt.CursorShape.SizeAllCursor)
         self.event_start = QtCore.QPointF(self.cursor().pos())
-        disable = getattr(self, "disable_mouse_events", None)
-        if disable is not None:
-            disable()
 
     def exit_movewin_mode(self) -> None:
         logger.debug("Exiting movewin mode")
         self.setMouseTracking(False)
         self.movewin_active = False
-        self.viewport_or_self.unsetCursor()
-        enable = getattr(self, "enable_mouse_events", None)
-        if enable is not None:
-            enable()
+        vp = self.viewport()
+        assert vp is not None
+        vp.unsetCursor()
 
     def dragEnterEvent(self, event: QtGui.QDragEnterEvent | None) -> None:
         assert event is not None
