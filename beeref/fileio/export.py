@@ -21,7 +21,7 @@ from xml.etree import ElementTree as ET
 from PyQt6 import QtCore, QtGui
 
 from .errors import BeeFileIOError
-from beeref import constants, widgets
+from beeref import widgets
 from beeref.items import BeePixmapItem
 
 
@@ -29,13 +29,12 @@ logger = logging.getLogger(__name__)
 
 
 class ExporterRegistry(dict):
-
     DEFAULT_TYPE = 0
 
     def __getitem__(self, key):
-        key = key.removeprefix('.')
+        key = key.removeprefix(".")
         exp = self.get(key, super().__getitem__(self.DEFAULT_TYPE))
-        logger.debug(f'Exporter for type {key}: {exp}')
+        logger.debug(f"Exporter for type {key}: {exp}")
         return exp
 
 
@@ -48,7 +47,6 @@ def register_exporter(cls):
 
 
 class ExporterBase:
-
     def emit_begin_processing(self, worker, start):
         if worker:
             worker.begin_processing.emit(start)
@@ -68,7 +66,7 @@ class ExporterBase:
 
     def handle_export_error(self, filename, error, worker):
         filename = str(filename)
-        logger.debug(f'Export failed: {error}')
+        logger.debug(f"Export failed: {error}")
         if worker:
             worker.finished.emit(filename, [str(error)])
             return
@@ -88,19 +86,17 @@ class SceneExporterBase(ExporterBase):
         # image, so deselect first. (Alternatively, pass an attribute
         # to paint functions to not paint them?)
         rect = self.scene.itemsBoundingRect()
-        logger.trace(f'Items bounding rect: {rect}')
+        logger.trace(f"Items bounding rect: {rect}")
         size = QtCore.QSize(int(rect.width()), int(rect.height()))
-        logger.trace(f'Export size without margins: {size}')
+        logger.trace(f"Export size without margins: {size}")
         self.margin = max(size.width(), size.height()) * 0.03
-        self.default_size = size.grownBy(
-            QtCore.QMargins(*([int(self.margin)] * 4)))
-        logger.debug(f'Default export margin: {self.margin}')
-        logger.debug(f'Default export size with margins: {self.default_size}')
+        self.default_size = size.grownBy(QtCore.QMargins(*([int(self.margin)] * 4)))
+        logger.debug(f"Default export margin: {self.margin}")
+        logger.debug(f"Default export size with margins: {self.default_size}")
 
 
 @register_exporter
 class SceneToPixmapExporter(SceneExporterBase):
-
     TYPE = ExporterRegistry.DEFAULT_TYPE
 
     def get_user_input(self, parent):
@@ -112,57 +108,58 @@ class SceneToPixmapExporter(SceneExporterBase):
         )
         if dialog.exec():
             size = dialog.value()
-            logger.debug(f'Got export size {size}')
+            logger.debug(f"Got export size {size}")
             self.size = size
             return True
         else:
             return False
 
     def render_to_image(self):
-        logger.debug(f'Final export size: {self.size}')
+        logger.debug(f"Final export size: {self.size}")
         margin = self.margin * self.size.width() / self.default_size.width()
-        logger.debug(f'Final export margin: {margin}')
+        logger.debug(f"Final export margin: {margin}")
 
         image = QtGui.QImage(self.size, QtGui.QImage.Format.Format_RGB32)
         from beeref.config import BeeSettings
-        canvas_color = BeeSettings().valueOrDefault('View/canvas_color')
+
+        canvas_color = BeeSettings().valueOrDefault("View/canvas_color")
         image.fill(QtGui.QColor(canvas_color))
         painter = QtGui.QPainter(image)
         target_rect = QtCore.QRectF(
             margin,
             margin,
             self.size.width() - 2 * margin,
-            self.size.height() - 2 * margin)
-        logger.trace(f'Final export target_rect: {target_rect}')
-        self.scene.render(painter,
-                          source=self.scene.itemsBoundingRect(),
-                          target=target_rect)
+            self.size.height() - 2 * margin,
+        )
+        logger.trace(f"Final export target_rect: {target_rect}")
+        self.scene.render(
+            painter, source=self.scene.itemsBoundingRect(), target=target_rect
+        )
         painter.end()
         return image
 
     def export(self, filename, worker=None):
-        logger.debug(f'Exporting scene to {filename}')
+        logger.debug(f"Exporting scene to {filename}")
         self.emit_begin_processing(worker, 1)
         image = self.render_to_image()
 
         if worker and worker.canceled:
-            logger.debug('Export canceled')
+            logger.debug("Export canceled")
             self.emit_finished(worker, filename, [])
             return
 
         if not image.save(filename, quality=90):
-            self.handle_export_error(filename, 'Error writing file', worker)
+            self.handle_export_error(filename, "Error writing file", worker)
             return
 
-        logger.debug('Export finished')
+        logger.debug("Export finished")
         self.emit_progress(worker, 1)
         self.emit_finished(worker, filename, [])
 
 
 @register_exporter
 class SceneToSVGExporter(SceneExporterBase):
-
-    TYPE = 'svg'
+    TYPE = "svg"
 
     def get_user_input(self, parent):
         self.size = self.default_size
@@ -170,63 +167,67 @@ class SceneToSVGExporter(SceneExporterBase):
 
     def _get_textstyles(self, item):
         fontstylemap = {
-            QtGui.QFont.Style.StyleNormal: 'normal',
-            QtGui.QFont.Style.StyleItalic: 'italic',
-            QtGui.QFont.Style.StyleOblique: 'oblique',
+            QtGui.QFont.Style.StyleNormal: "normal",
+            QtGui.QFont.Style.StyleItalic: "italic",
+            QtGui.QFont.Style.StyleOblique: "oblique",
         }
 
         font = item.font()
         fontsize = font.pointSize() * item.scale()
-        families = ', '.join(font.families())
+        families = ", ".join(font.families())
         fontstyle = fontstylemap[font.style()]
 
-        return ('white-space:pre',
-                f'font-size:{fontsize}pt',
-                f'font-family:{families}',
-                f'font-weight:{font.weight()}',
-                f'font-stretch:{font.stretch()}',
-                f'font-style:{fontstyle}')
+        return (
+            "white-space:pre",
+            f"font-size:{fontsize}pt",
+            f"font-family:{families}",
+            f"font-weight:{font.weight()}",
+            f"font-stretch:{font.stretch()}",
+            f"font-style:{fontstyle}",
+        )
 
     def render_to_svg(self, worker=None):
         svg = ET.Element(
-            'svg',
-            attrib={'width': str(self.size.width()),
-                    'height': str(self.size.height()),
-                    'xmlns': 'http://www.w3.org/2000/svg',
-                    'xmlns:xlink': 'http://www.w3.org/1999/xlink',
-                    })
+            "svg",
+            attrib={
+                "width": str(self.size.width()),
+                "height": str(self.size.height()),
+                "xmlns": "http://www.w3.org/2000/svg",
+                "xmlns:xlink": "http://www.w3.org/1999/xlink",
+            },
+        )
 
         rect = self.scene.itemsBoundingRect()
         offset = rect.topLeft() - QtCore.QPointF(self.margin, self.margin)
 
-        for i, item in enumerate(sorted(self.scene.items(),
-                                        key=lambda x: x.zValue())):
+        for i, item in enumerate(sorted(self.scene.items(), key=lambda x: x.zValue())):
             # z order in SVG specified via the order of elements in the tree
             pos = item.pos() - offset
             anchor = pos
 
-            if item.TYPE == 'text':
+            if item.TYPE == "text":
                 styles = self._get_textstyles(item)
                 element = ET.Element(
-                    'text',
-                    attrib={'style': ';'.join(styles),
-                            'dominant-baseline': 'hanging'})
+                    "text",
+                    attrib={"style": ";".join(styles), "dominant-baseline": "hanging"},
+                )
                 element.text = item._markdown
-            if item.TYPE == 'pixmap':
+            if item.TYPE == "pixmap":
                 width = item.width * item.scale()
                 height = item.height * item.scale()
-                pixmap, imgformat = item.pixmap_to_bytes(
-                    apply_crop=True)
-                pixmap = base64.b64encode(pixmap).decode('ascii')
+                pixmap, imgformat = item.pixmap_to_bytes(apply_crop=True)
+                pixmap = base64.b64encode(pixmap).decode("ascii")
                 element = ET.Element(
-                    'image',
+                    "image",
                     attrib={
-                        'xlink:href':
-                        f'data:image/{imgformat};base64,{pixmap}',
-                        'width': str(width),
-                        'height': str(height),
-                        'image-rendering': ('crisp-edges' if item.scale() > 2
-                                            else 'optimizeQuality')})
+                        "xlink:href": f"data:image/{imgformat};base64,{pixmap}",
+                        "width": str(width),
+                        "height": str(height),
+                        "image-rendering": (
+                            "crisp-edges" if item.scale() > 2 else "optimizeQuality"
+                        ),
+                    },
+                )
                 pos = pos + item.crop.topLeft()
 
             transforms = []
@@ -235,16 +236,15 @@ class SceneToSVGExporter(SceneExporterBase):
                 # official standard:
                 # element.set('transform-origin', f'{anchor.x()} {anchor.y()}')
                 # Thus we need to fix the origin manually
-                transforms.append(f'translate({anchor.x()} {anchor.y()})')
-                transforms.append(f'scale({item.flip()} 1)')
-                transforms.append(f'translate(-{anchor.x()} -{anchor.y()})')
-            transforms.append(
-                f'rotate({item.rotation()} {anchor.x()} {anchor.y()})')
+                transforms.append(f"translate({anchor.x()} {anchor.y()})")
+                transforms.append(f"scale({item.flip()} 1)")
+                transforms.append(f"translate(-{anchor.x()} -{anchor.y()})")
+            transforms.append(f"rotate({item.rotation()} {anchor.x()} {anchor.y()})")
 
-            element.set('transform', ' '.join(transforms))
-            element.set('x', str(pos.x()))
-            element.set('y', str(pos.y()))
-            element.set('opacity', str(item.opacity()))
+            element.set("transform", " ".join(transforms))
+            element.set("x", str(pos.x()))
+            element.set("y", str(pos.y()))
+            element.set("opacity", str(item.opacity()))
 
             svg.append(element)
             self.emit_progress(worker, i)
@@ -254,26 +254,26 @@ class SceneToSVGExporter(SceneExporterBase):
         return svg
 
     def export(self, filename, worker=None):
-        logger.debug(f'Exporting scene to {filename}')
+        logger.debug(f"Exporting scene to {filename}")
         self.emit_begin_processing(worker, len(self.scene.items()))
         svg = self.render_to_svg(worker)
 
         if worker and worker.canceled:
-            logger.debug('Export canceled')
+            logger.debug("Export canceled")
             worker.finished.emit(filename, [])
             return
 
         tree = ET.ElementTree(svg)
-        ET.indent(tree, space='  ')
+        ET.indent(tree, space="  ")
 
         try:
-            with open(filename, 'w') as f:
-                tree.write(f, encoding='unicode', xml_declaration=True)
+            with open(filename, "w") as f:
+                tree.write(f, encoding="unicode", xml_declaration=True)
         except OSError as e:
             self.handle_export_error(filename, e, worker)
             return
 
-        logger.debug('Export finished')
+        logger.debug("Export finished")
         self.emit_finished(worker, filename, [])
 
 
@@ -297,16 +297,15 @@ class ImagesToDirectoryExporter(ExporterBase):
         self.handle_existing = None
 
     def export(self, worker=None):
-        logger.debug(f'Exporting images to {self.dirname}')
-        logger.debug(f'Starting at {self.start_from}')
+        logger.debug(f"Exporting images to {self.dirname}")
+        logger.debug(f"Starting at {self.start_from}")
 
         self.emit_begin_processing(worker, self.num_total)
         self.emit_progress(worker, self.start_from)
 
-        for i, item in enumerate(
-                self.items[self.start_from:], start=self.start_from):
+        for i, item in enumerate(self.items[self.start_from :], start=self.start_from):
             if worker and worker.canceled:
-                logger.debug('Export canceled')
+                logger.debug("Export canceled")
                 worker.finished.emit(self.dirname, [])
                 return
 
@@ -327,26 +326,26 @@ class ImagesToDirectoryExporter(ExporterBase):
                 return
 
             if path_exists:
-                logger.debug(f'File already exists: {path}')
+                logger.debug(f"File already exists: {path}")
                 if self.handle_existing is None:
                     self.start_from = i
                     self.emit_user_input_required(worker, str(path))
                     return
                 else:
-                    if self.handle_existing == 'skip':
+                    if self.handle_existing == "skip":
                         self.handle_existing = None
-                        logger.debug('Skipping file')
+                        logger.debug("Skipping file")
                         continue
-                    elif self.handle_existing == 'skip_all':
-                        logger.debug('Skipping file')
+                    elif self.handle_existing == "skip_all":
+                        logger.debug("Skipping file")
                         continue
-                    elif self.handle_existing == 'overwrite':
+                    elif self.handle_existing == "overwrite":
                         self.handle_existing = None
-                        logger.debug('Overwrite file')
-                    elif self.handle_existing == 'overwrite_all':
-                        logger.debug('Overwrite file')
+                        logger.debug("Overwrite file")
+                    elif self.handle_existing == "overwrite_all":
+                        logger.debug("Overwrite file")
 
-            logger.debug(f'Writing file: {path}')
+            logger.debug(f"Writing file: {path}")
             try:
                 path.write_bytes(pixmap)
             except OSError as e:
