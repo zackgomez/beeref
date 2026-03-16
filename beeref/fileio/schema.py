@@ -1,4 +1,4 @@
-USER_VERSION = 2
+USER_VERSION = 3
 APPLICATION_ID = 2060242126
 
 
@@ -13,7 +13,9 @@ SCHEMA = [
         scale REAL DEFAULT 1,
         rotation REAL DEFAULT 0,
         flip INTEGER DEFAULT 1,
-        data JSON
+        data JSON,
+        width INTEGER,
+        height INTEGER
     )
     """,
     """
@@ -33,9 +35,31 @@ SCHEMA = [
 ]
 
 
+def _populate_image_dimensions(io):
+    """Read image headers from sqlar blobs to populate width/height."""
+    from io import BytesIO
+    from PIL import Image
+
+    rows = io.fetchall(
+        'SELECT item_id, data FROM sqlar')
+    for item_id, blob in rows:
+        try:
+            img = Image.open(BytesIO(blob))
+            w, h = img.size
+            io.ex('UPDATE items SET width=?, height=? WHERE id=?',
+                  (w, h, item_id))
+        except Exception:
+            pass
+
+
 MIGRATIONS = {
     2: [
         "ALTER TABLE items ADD COLUMN data JSON",
         "UPDATE items SET data = json_object('filename', filename)",
+    ],
+    3: [
+        "ALTER TABLE items ADD COLUMN width INTEGER",
+        "ALTER TABLE items ADD COLUMN height INTEGER",
+        _populate_image_dimensions,
     ],
 }

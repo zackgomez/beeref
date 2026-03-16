@@ -145,7 +145,10 @@ class SQLiteIO:
         for i in range(version, USER_VERSION):
             logger.debug(f'Migrating from version {i} to {i + 1}...')
             for migration in MIGRATIONS[i + 1]:
-                self.ex(migration)
+                if callable(migration):
+                    migration(self)
+                else:
+                    self.ex(migration)
         self.write_meta()
         self.connection.commit()
         logger.debug('Migration finished')
@@ -295,13 +298,20 @@ class SQLiteIO:
         self.connection.commit()
 
     def insert_item(self, item):
+        width = None
+        height = None
+        if hasattr(item, 'pixmap'):
+            pm = item.pixmap()
+            if not pm.isNull():
+                width = pm.width()
+                height = pm.height()
         self.ex(
             'INSERT INTO items (type, x, y, z, scale, rotation, flip, '
-            'data) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'data, width, height) '
+            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             (item.TYPE, item.pos().x(), item.pos().y(), item.zValue(),
              item.scale(), item.rotation(), item.flip(),
-             json.dumps(item.get_extra_save_data())))
+             json.dumps(item.get_extra_save_data()), width, height))
         item.save_id = self.cursor.lastrowid
 
         if hasattr(item, 'pixmap_to_bytes'):
