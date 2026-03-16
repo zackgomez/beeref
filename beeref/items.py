@@ -22,6 +22,7 @@ from functools import cached_property
 import logging
 import os.path
 
+from PIL import Image
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
@@ -112,11 +113,15 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
     TYPE = 'pixmap'
     CROP_HANDLE_SIZE = 15
 
+    MIP_MIN_DIM = 128
+
     def __init__(self, image, filename=None, **kwargs):
         super().__init__(QtGui.QPixmap.fromImage(image))
         self.save_id = None
         self.filename = filename
         self.reset_crop()
+        self._mip_chain = []
+        self._generate_mips()
         logger.debug(f'Initialized {self}')
         self.is_image = True
         self.crop_mode = False
@@ -268,9 +273,57 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         img.save(buffer, imgformat.upper(), quality=90)
         return (barray.data(), imgformat)
 
+    def _qpixmap_to_pil(self, pixmap):
+        """Convert a QPixmap to a PIL Image."""
+        img = pixmap.toImage()
+        if img.hasAlphaChannel():
+            img = img.convertToFormat(QtGui.QImage.Format.Format_RGBA8888)
+            mode = 'RGBA'
+        else:
+            img = img.convertToFormat(QtGui.QImage.Format.Format_RGB888)
+            mode = 'RGB'
+        ptr = img.constBits()
+        ptr.setsize(img.sizeInBytes())
+        return Image.frombytes(mode, (img.width(), img.height()),
+                               bytes(ptr), 'raw', mode, img.bytesPerLine())
+
+    def _pil_to_qpixmap(self, pil_img):
+        """Convert a PIL Image to a QPixmap."""
+        if pil_img.mode == 'RGBA':
+            fmt = QtGui.QImage.Format.Format_RGBA8888
+            channels = 4
+        else:
+            fmt = QtGui.QImage.Format.Format_RGB888
+            channels = 3
+        data = pil_img.tobytes()
+        stride = channels * pil_img.width
+        qimg = QtGui.QImage(data, pil_img.width, pil_img.height, stride, fmt)
+        return QtGui.QPixmap.fromImage(qimg.copy())
+
+    def _generate_mips(self):
+        """Pre-compute half-res mip levels using Pillow LANCZOS."""
+        pm = self.pixmap()
+        if pm.isNull() or min(pm.width(), pm.height()) < self.MIP_MIN_DIM * 2:
+            self._mip_chain = []
+            return
+
+        pil_img = self._qpixmap_to_pil(pm)
+        self._mip_chain = []
+        level = 1
+        while True:
+            new_w = pm.width() >> level
+            new_h = pm.height() >> level
+            if min(new_w, new_h) < self.MIP_MIN_DIM:
+                break
+            mip = pil_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            scale = 1 / (1 << level)
+            self._mip_chain.append((self._pil_to_qpixmap(mip), scale))
+            level += 1
+
     def setPixmap(self, pixmap):
         super().setPixmap(pixmap)
         self.reset_crop()
+        self._generate_mips()
 
     def pixmap_from_bytes(self, data):
         """Set image pimap from a bytestring."""
@@ -446,8 +499,21 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         painter.setPen(pen)
         painter.drawRect(rect)
 
+    def _get_mip(self, effective_scale):
+        """Pick the coarsest mip level that won't require upscaling."""
+        pm = None
+        mip_scale = None
+        for mip_pm, ms in self._mip_chain:
+            if ms <= effective_scale:
+                break
+            pm = mip_pm
+            mip_scale = ms
+        return pm, mip_scale
+
     def paint(self, painter, option, widget):
-        if abs(painter.combinedTransform().m11()) < 2:
+        effective_scale = abs(painter.combinedTransform().m11())
+
+        if effective_scale < 2:
             # We want image smoothing, but only for images where we
             # are not zoomed in a lot. This is to ensure that for
             # example icons and pixel sprites can be viewed correctly.
@@ -472,7 +538,21 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
             self.draw_crop_rect(painter, self.crop_temp)
         else:
             pm = self._grayscale_pixmap if self.grayscale else self.pixmap()
-            painter.drawPixmap(self.crop, pm, self.crop)
+            source_crop = self.crop
+
+            if (not self.grayscale
+                    and effective_scale < 0.8
+                    and self._mip_chain):
+                mip_pm, mip_scale = self._get_mip(effective_scale)
+                if mip_pm is not None:
+                    pm = mip_pm
+                    source_crop = QtCore.QRectF(
+                        self.crop.x() * mip_scale,
+                        self.crop.y() * mip_scale,
+                        self.crop.width() * mip_scale,
+                        self.crop.height() * mip_scale)
+
+            painter.drawPixmap(self.crop, pm, source_crop)
             self.paint_selectable(painter, option, widget)
 
     def enter_crop_mode(self):
