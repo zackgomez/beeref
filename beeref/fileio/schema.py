@@ -40,26 +40,24 @@ def _populate_image_dimensions(io):
     from io import BytesIO
     from PIL import Image
 
-    rows = io.fetchall(
-        'SELECT item_id, data FROM sqlar')
+    rows = io.fetchall("SELECT item_id, data FROM sqlar")
     for item_id, blob in rows:
         try:
             img = Image.open(BytesIO(blob))
             w, h = img.size
-            io.ex('UPDATE items SET width=?, height=? WHERE id=?',
-                  (w, h, item_id))
+            io.ex("UPDATE items SET width=?, height=? WHERE id=?", (w, h, item_id))
         except Exception:
             pass
 
 
 MIGRATIONS = {
     2: [
-        "ALTER TABLE items ADD COLUMN data JSON",
-        "UPDATE items SET data = json_object('filename', filename)",
+        lambda io: io.ex("ALTER TABLE items ADD COLUMN data JSON"),
+        lambda io: io.ex("UPDATE items SET data = json_object('filename', filename)"),
     ],
     3: [
-        "ALTER TABLE items ADD COLUMN width INTEGER",
-        "ALTER TABLE items ADD COLUMN height INTEGER",
+        lambda io: io.ex("ALTER TABLE items ADD COLUMN width INTEGER"),
+        lambda io: io.ex("ALTER TABLE items ADD COLUMN height INTEGER"),
         _populate_image_dimensions,
     ],
 }

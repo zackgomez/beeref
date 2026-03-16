@@ -45,7 +45,7 @@ logger = getLogger(__name__)
 def is_bee_file(path):
     """Check whether the file at the given path is a bee file."""
 
-    return os.path.splitext(path)[1] == '.bee'
+    return os.path.splitext(path)[1] == ".bee"
 
 
 def handle_sqlite_errors(func):
@@ -53,13 +53,12 @@ def handle_sqlite_errors(func):
         try:
             func(self, *args, **kwargs)
         except Exception as e:
-            logger.exception(f'Error while reading/writing {self.filename}')
+            logger.exception(f"Error while reading/writing {self.filename}")
             try:
                 # Try to roll back transaction if there is any
-                if (hasattr(self, '_connection')
-                        and self._connection.in_transaction):
-                    self.ex('ROLLBACK')
-                    logger.debug('Transaction rolled back')
+                if hasattr(self, "_connection") and self._connection.in_transaction:
+                    self.ex("ROLLBACK")
+                    logger.debug("Transaction rolled back")
             except sqlite3.Error:
                 pass
             self._close_connection()
@@ -72,9 +71,7 @@ def handle_sqlite_errors(func):
 
 
 class SQLiteIO:
-
-    def __init__(self, filename, scene, create_new=False, readonly=False,
-                 worker=None):
+    def __init__(self, filename, scene, create_new=False, readonly=False, worker=None):
         self.scene = scene
         self.create_new = create_new
         self.filename = filename
@@ -86,19 +83,17 @@ class SQLiteIO:
         self._close_connection()
 
     def _close_connection(self):
-        if hasattr(self, '_connection'):
+        if hasattr(self, "_connection"):
             self._connection.close()
-            delattr(self, '_connection')
-        if hasattr(self, '_cursor'):
-            delattr(self, '_cursor')
-        if hasattr(self, '_tmpdir'):
+            delattr(self, "_connection")
+        if hasattr(self, "_cursor"):
+            delattr(self, "_cursor")
+        if hasattr(self, "_tmpdir"):
             self._tmpdir.cleanup()
-            delattr(self, '_tmpdir')
+            delattr(self, "_tmpdir")
 
     def _establish_connection(self):
-        if (self.create_new
-                and not self.readonly
-                and os.path.exists(self.filename)):
+        if self.create_new and not self.readonly and os.path.exists(self.filename):
             os.remove(self.filename)
 
         if self.create_new:
@@ -106,7 +101,7 @@ class SQLiteIO:
 
         uri = pathlib.Path(self.filename).resolve().as_uri()
         if self.readonly:
-            uri = f'{uri}?mode=rw'
+            uri = f"{uri}?mode=rw"
         self._connection = sqlite3.connect(uri, uri=True)
         self._cursor = self.connection.cursor()
         if not self.create_new:
@@ -114,54 +109,50 @@ class SQLiteIO:
                 self._migrate()
             except Exception:
                 # Updating a file failed; try creating it from scratch instead
-                logger.exception('Error migrating bee file')
+                logger.exception("Error migrating bee file")
                 self.create_new = True
                 self._establish_connection()
 
     def _migrate(self):
         """Migrate database if necessary."""
 
-        version = self.fetchone('PRAGMA user_version')[0]
-        logger.debug(f'Found bee file version: {version}')
+        version = self.fetchone("PRAGMA user_version")[0]
+        logger.debug(f"Found bee file version: {version}")
         if version >= USER_VERSION:
-            logger.debug('Version ok; no migrations necessary')
+            logger.debug("Version ok; no migrations necessary")
             return
 
         if self.readonly:
             try:
                 # See whether file is writable so we can migrate it directly
-                self.ex('PRAGMA application_id=%s' % APPLICATION_ID)
+                self.ex("PRAGMA application_id=%s" % APPLICATION_ID)
             except sqlite3.Error:
-                logger.debug('File not writable; use temporary copy instead')
+                logger.debug("File not writable; use temporary copy instead")
                 self._connection.close()
-                self._tmpdir = tempfile.TemporaryDirectory(
-                    prefix=constants.APPNAME)
-                tmpname = os.path.join(self._tmpdir.name, 'mig.bee')
+                self._tmpdir = tempfile.TemporaryDirectory(prefix=constants.APPNAME)
+                tmpname = os.path.join(self._tmpdir.name, "mig.bee")
                 shutil.copyfile(self.filename, tmpname)
                 self._connection = sqlite3.connect(tmpname)
                 self._cursor = self.connection.cursor()
 
-        self.ex('BEGIN TRANSACTION')
+        self.ex("BEGIN TRANSACTION")
         for i in range(version, USER_VERSION):
-            logger.debug(f'Migrating from version {i} to {i + 1}...')
+            logger.debug(f"Migrating from version {i} to {i + 1}...")
             for migration in MIGRATIONS[i + 1]:
-                if callable(migration):
-                    migration(self)
-                else:
-                    self.ex(migration)
+                migration(self)
         self.write_meta()
         self.connection.commit()
-        logger.debug('Migration finished')
+        logger.debug("Migration finished")
 
     @property
     def connection(self):
-        if not hasattr(self, '_connection'):
+        if not hasattr(self, "_connection"):
             self._establish_connection()
         return self._connection
 
     @property
     def cursor(self):
-        if not hasattr(self, '_cursor'):
+        if not hasattr(self, "_cursor"):
             self._establish_connection()
         return self._cursor
 
@@ -180,9 +171,9 @@ class SQLiteIO:
         return self.cursor.fetchall()
 
     def write_meta(self):
-        self.ex('PRAGMA application_id=%s' % APPLICATION_ID)
-        self.ex('PRAGMA user_version=%s' % USER_VERSION)
-        self.ex('PRAGMA foreign_keys=ON')
+        self.ex("PRAGMA application_id=%s" % APPLICATION_ID)
+        self.ex("PRAGMA user_version=%s" % USER_VERSION)
+        self.ex("PRAGMA foreign_keys=ON")
 
     def create_schema_on_new(self):
         if self.create_new:
@@ -193,49 +184,54 @@ class SQLiteIO:
     @handle_sqlite_errors
     def read(self):
         rows = self.fetchall(
-            'SELECT items.id, type, x, y, z, scale, rotation, flip, '
-            'items.data, sqlar.data '
-            'FROM sqlar JOIN items on sqlar.item_id = items.id')
+            "SELECT items.id, type, x, y, z, scale, rotation, flip, "
+            "items.data, sqlar.data "
+            "FROM sqlar JOIN items on sqlar.item_id = items.id"
+        )
         # Avoid OUTER JOIN for performance reasons; fetch text items
         # separately instead
-        rows.extend(self.fetchall(
-            'SELECT items.id, type, x, y, z, scale, rotation, flip, '
-            ' items.data, null as data '
-            'FROM items '
-            'WHERE items.type = "text"'))
+        rows.extend(
+            self.fetchall(
+                "SELECT items.id, type, x, y, z, scale, rotation, flip, "
+                " items.data, null as data "
+                "FROM items "
+                'WHERE items.type = "text"'
+            )
+        )
         if self.worker:
             self.worker.begin_processing.emit(len(rows))
 
         for i, row in enumerate(rows):
             data = {
-                'save_id': row[0],
-                'type': row[1],
-                'x': row[2],
-                'y': row[3],
-                'z': row[4],
-                'scale': row[5],
-                'rotation': row[6],
-                'flip': row[7],
-                'data': json.loads(row[8]),
+                "save_id": row[0],
+                "type": row[1],
+                "x": row[2],
+                "y": row[3],
+                "z": row[4],
+                "scale": row[5],
+                "rotation": row[6],
+                "flip": row[7],
+                "data": json.loads(row[8]),
             }
 
-            if data['type'] == 'pixmap':
+            if data["type"] == "pixmap":
                 item = BeePixmapItem(QtGui.QImage())
                 item.pixmap_from_bytes(row[9])
                 if item.pixmap().isNull():
-                    item = data['data']['text'] = (
-                        f'Image could not be loaded: {item.filename}\n'
-                        + IMG_LOADING_ERROR_MSG)
-                    data['type'] = BeeErrorItem.TYPE
-                data['item'] = item
+                    item = data["data"]["text"] = (
+                        f"Image could not be loaded: {item.filename}\n"
+                        + IMG_LOADING_ERROR_MSG
+                    )
+                    data["type"] = BeeErrorItem.TYPE
+                data["item"] = item
 
             self.scene.add_item_later(data)
 
             if self.worker:
-                logger.trace(f'Emit progress: {i}')
+                logger.trace(f"Emit progress: {i}")
                 self.worker.progress.emit(i)
                 if self.worker.canceled:
-                    self.worker.finished.emit('', [])
+                    self.worker.finished.emit("", [])
                     return
                 # Give main thread time to process items:
                 self.worker.msleep(10)
@@ -245,8 +241,7 @@ class SQLiteIO:
     @handle_sqlite_errors
     def write(self):
         if self.readonly:
-            raise sqlite3.OperationalError(
-                'Attempt to write to a readonly database')
+            raise sqlite3.OperationalError("Attempt to write to a readonly database")
         try:
             self.create_schema_on_new()
             self.write_data()
@@ -257,25 +252,26 @@ class SQLiteIO:
             else:
                 self.retry = True
                 # Try creating file from scratch and save again
-                logger.exception(
-                    f'Updating to existing file {self.filename} failed')
+                logger.exception(f"Updating to existing file {self.filename} failed")
                 self.create_new = True
                 self._close_connection()
                 self.write()
 
     def write_data(self):
-        to_delete = {row[0] for row in self.fetchall('SELECT id from ITEMS')}
+        to_delete = {row[0] for row in self.fetchall("SELECT id from ITEMS")}
         # We don't want to touch existing items that are displayed as errors:
-        keep = {item.original_save_id
-                for item in self.scene.items_by_type(BeeErrorItem.TYPE)}
-        logger.debug(f'Not saving error items: {keep}')
+        keep = {
+            item.original_save_id
+            for item in self.scene.items_by_type(BeeErrorItem.TYPE)
+        }
+        logger.debug(f"Not saving error items: {keep}")
         to_delete = to_delete - keep
 
         to_save = list(self.scene.items_for_save())
         if self.worker:
             self.worker.begin_processing.emit(len(to_save))
         for i, item in enumerate(to_save):
-            logger.debug(f'Saving {item} with id {item.save_id}')
+            logger.debug(f"Saving {item} with id {item.save_id}")
             if item.save_id:
                 self.update_item(item)
                 to_delete.remove(item.save_id)
@@ -286,41 +282,52 @@ class SQLiteIO:
                 if self.worker.canceled:
                     break
         self.delete_items(to_delete)
-        self.ex('VACUUM')
+        self.ex("VACUUM")
         self.connection.commit()
         if self.worker:
             self.worker.finished.emit(self.filename, [])
 
     def delete_items(self, to_delete):
         to_delete = [(pk,) for pk in to_delete]
-        self.exmany('DELETE FROM items WHERE id=?', to_delete)
-        self.exmany('DELETE FROM sqlar WHERE item_id=?', to_delete)
+        self.exmany("DELETE FROM items WHERE id=?", to_delete)
+        self.exmany("DELETE FROM sqlar WHERE item_id=?", to_delete)
         self.connection.commit()
 
     def insert_item(self, item):
         width = None
         height = None
-        if hasattr(item, 'pixmap'):
+        if hasattr(item, "pixmap"):
             pm = item.pixmap()
             if not pm.isNull():
                 width = pm.width()
                 height = pm.height()
         self.ex(
-            'INSERT INTO items (type, x, y, z, scale, rotation, flip, '
-            'data, width, height) '
-            'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            (item.TYPE, item.pos().x(), item.pos().y(), item.zValue(),
-             item.scale(), item.rotation(), item.flip(),
-             json.dumps(item.get_extra_save_data()), width, height))
+            "INSERT INTO items (type, x, y, z, scale, rotation, flip, "
+            "data, width, height) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                item.TYPE,
+                item.pos().x(),
+                item.pos().y(),
+                item.zValue(),
+                item.scale(),
+                item.rotation(),
+                item.flip(),
+                json.dumps(item.get_extra_save_data()),
+                width,
+                height,
+            ),
+        )
         item.save_id = self.cursor.lastrowid
 
-        if hasattr(item, 'pixmap_to_bytes'):
+        if hasattr(item, "pixmap_to_bytes"):
             pixmap, imgformat = item.pixmap_to_bytes()
             name = item.get_filename_for_export(imgformat)
             self.ex(
-                'INSERT INTO sqlar (item_id, name, mode, sz, data) '
-                'VALUES (?, ?, ?, ?, ?)',
-                (item.save_id, name, 0o644, len(pixmap), pixmap))
+                "INSERT INTO sqlar (item_id, name, mode, sz, data) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (item.save_id, name, 0o644, len(pixmap), pixmap),
+            )
         self.connection.commit()
 
     def update_item(self, item):
@@ -330,11 +337,18 @@ class SQLiteIO:
         data never changes and is also time-consuming to save.
         """
         self.ex(
-            'UPDATE items SET x=?, y=?, z=?, scale=?, rotation=?, flip=?, '
-            'data=? '
-            'WHERE id=?',
-            (item.pos().x(), item.pos().y(), item.zValue(), item.scale(),
-             item.rotation(), item.flip(),
-             json.dumps(item.get_extra_save_data()),
-             item.save_id))
+            "UPDATE items SET x=?, y=?, z=?, scale=?, rotation=?, flip=?, "
+            "data=? "
+            "WHERE id=?",
+            (
+                item.pos().x(),
+                item.pos().y(),
+                item.zValue(),
+                item.scale(),
+                item.rotation(),
+                item.flip(),
+                json.dumps(item.get_extra_save_data()),
+                item.save_id,
+            ),
+        )
         self.connection.commit()
