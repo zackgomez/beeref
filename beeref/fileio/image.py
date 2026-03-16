@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+import io
 import logging
 import os.path
 import tempfile
@@ -21,77 +22,82 @@ from urllib import parse, request
 
 from PyQt6 import QtGui
 
-import exif
+from PIL import Image, ImageCms, ImageOps
 from lxml import etree
-import plum
 
 
 logger = logging.getLogger(__name__)
 
+SRGB_PROFILE = ImageCms.createProfile('sRGB')
 
-def exif_rotated_image(path=None):
-    """Returns a QImage that is transformed according to the source's
-    orientation EXIF data.
-    """
 
-    img = QtGui.QImage(path)
-    if img.isNull():
-        return img
+def _pil_to_qimage(pil_img):
+    """Convert a PIL Image to a QImage."""
+    if pil_img.mode == 'RGBA':
+        fmt = QtGui.QImage.Format.Format_RGBA8888
+        channels = 4
+    else:
+        pil_img = pil_img.convert('RGB')
+        fmt = QtGui.QImage.Format.Format_RGB888
+        channels = 3
 
-    with open(path, 'rb') as f:
-        try:
-            exifimg = exif.Image(f)
-        except (plum.exceptions.UnpackError, NotImplementedError):
-            logger.exception(f'Exif parser failed on image: {path}')
-            return img
+    data = pil_img.tobytes()
+    stride = channels * pil_img.width
+    qimg = QtGui.QImage(data, pil_img.width, pil_img.height, stride, fmt)
+    return qimg.copy()  # detach from buffer
 
-    try:
-        if 'orientation' in exifimg.list_all():
-            orientation = exifimg.orientation
+
+def _ensure_srgb(pil_img):
+    """Convert CMYK or ICC-profiled images to sRGB."""
+    icc = pil_img.info.get('icc_profile')
+
+    if pil_img.mode == 'CMYK':
+        if icc:
+            src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+            dst = ImageCms.ImageCmsProfile(SRGB_PROFILE)
+            return ImageCms.profileToProfile(pil_img, src, dst,
+                                             outputMode='RGB')
         else:
-            return img
-    except (NotImplementedError, ValueError):
-        logger.exception(f'Exif failed reading orientation of image: {path}')
-        return img
+            logger.warning('CMYK image with no ICC profile, '
+                           'using naive conversion')
+            return pil_img.convert('RGB')
 
-    transform = QtGui.QTransform()
+    if icc and pil_img.mode in ('RGB', 'RGBA'):
+        try:
+            src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
+            dst = ImageCms.ImageCmsProfile(SRGB_PROFILE)
+            return ImageCms.profileToProfile(pil_img, src, dst,
+                                             outputMode=pil_img.mode)
+        except ImageCms.PyCMSError:
+            logger.debug('ICC profile conversion failed, using image as-is')
 
-    if orientation == exif.Orientation.TOP_RIGHT:
-        return img.mirrored(horizontal=True, vertical=False)
-    if orientation == exif.Orientation.BOTTOM_RIGHT:
-        transform.rotate(180)
-        return img.transformed(transform)
-    if orientation == exif.Orientation.BOTTOM_LEFT:
-        return img.mirrored(horizontal=False, vertical=True)
-    if orientation == exif.Orientation.LEFT_TOP:
-        transform.rotate(90)
-        return img.transformed(transform).mirrored(
-            horizontal=True, vertical=False)
-    if orientation == exif.Orientation.RIGHT_TOP:
-        transform.rotate(90)
-        return img.transformed(transform)
-    if orientation == exif.Orientation.RIGHT_BOTTOM:
-        transform.rotate(270)
-        return img.transformed(transform).mirrored(
-            horizontal=True, vertical=False)
-    if orientation == exif.Orientation.LEFT_BOTTOM:
-        transform.rotate(270)
-        return img.transformed(transform)
+    return pil_img
 
-    return img
+
+def load_pil_image(path):
+    """Load image via Pillow with EXIF rotation and color management.
+    Returns a QImage (null if loading fails)."""
+    try:
+        pil_img = Image.open(path)
+        pil_img = ImageOps.exif_transpose(pil_img)
+        pil_img = _ensure_srgb(pil_img)
+        return _pil_to_qimage(pil_img)
+    except Exception:
+        logger.debug(f'Failed to load image: {path}')
+        return QtGui.QImage()
 
 
 def load_image(path):
     if isinstance(path, str):
         path = os.path.normpath(path)
-        return (exif_rotated_image(path), path)
+        return (load_pil_image(path), path)
     if path.isLocalFile():
         path = os.path.normpath(path.toLocalFile())
-        return (exif_rotated_image(path), path)
+        return (load_pil_image(path), path)
 
     url = bytes(path.toEncoded()).decode()
     domain = '.'.join(parse.urlparse(url).netloc.split(".")[-2:])
-    img = exif_rotated_image()
+    img = QtGui.QImage()
     if domain == 'pinterest.com':
         try:
             page_data = request.urlopen(url).read()
@@ -109,5 +115,5 @@ def load_image(path):
             with open(fname, 'wb') as f:
                 f.write(imgdata)
                 logger.debug(f'Temporarily saved in: {fname}')
-            img = exif_rotated_image(fname)
+            img = load_pil_image(fname)
     return (img, url)

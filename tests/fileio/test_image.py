@@ -5,35 +5,19 @@ from unittest.mock import patch
 import httpretty
 import pytest
 
-import plum
-
 from PyQt6 import QtCore, QtGui
 
-from beeref.fileio.image import exif_rotated_image, load_image
+from beeref.fileio.image import load_pil_image, load_image
 
 
-def test_exif_rotated_image_without_path(qapp):
-    img = exif_rotated_image()
+def test_load_pil_image_without_path(qapp):
+    img = load_pil_image(None)
     assert img.isNull() is True
 
 
-def test_exif_rotated_image_not_a_file(qapp):
-    img = exif_rotated_image('foo')
+def test_load_pil_image_not_a_file(qapp):
+    img = load_pil_image('foo')
     assert img.isNull() is True
-
-
-def test_exif_rotated_image_exif_unpack_error(qapp, imgfilename3x3):
-    with patch('beeref.fileio.image.exif.Image',
-               side_effect=plum.exceptions.UnpackError()):
-        img = exif_rotated_image(imgfilename3x3)
-        assert img.isNull() is False
-
-
-def test_exif_rotated_image_exif_notimplementederror(qapp, imgfilename3x3):
-    with patch('beeref.fileio.image.exif.Image.list_all',
-               side_effect=NotImplementedError()):
-        img = exif_rotated_image(imgfilename3x3)
-        assert img.isNull() is False
 
 
 @pytest.mark.parametrize('path,expected',
@@ -46,12 +30,12 @@ def test_exif_rotated_image_exif_notimplementederror(qapp, imgfilename3x3):
                           ('test3x3_orientation6.jpg', 'test3x3.jpg'),
                           ('test3x3_orientation7.jpg', 'test3x3.jpg'),
                           ('test3x3_orientation8.jpg', 'test3x3.jpg')])
-def test_exif_rotated_image(path, expected, qapp):
+def test_load_pil_image_exif_orientation(path, expected, qapp):
     def get_fname(p):
         root = os.path.dirname(__file__)
         return os.path.join(root, '..', 'assets', p)
 
-    img = exif_rotated_image(get_fname(path))
+    img = load_pil_image(get_fname(path))
     assert img.isNull() is False
     expected = QtGui.QImage(get_fname(expected))
     assert expected.isNull() is False
