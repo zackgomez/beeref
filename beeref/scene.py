@@ -49,6 +49,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         super().__init__()
         self.active_mode = None
         self.undo_stack = undo_stack
+        self._scratch_file: str | None = None
         self.max_z = 0
         self.min_z = 0
         self.Z_STEP = 0.001

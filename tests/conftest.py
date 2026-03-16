@@ -15,20 +15,22 @@ def pytest_configure(config):
     # This needs to be done before the application code is even loaded since
     # logging configuration happens on module level
     import logging.config
+
     logging.config.dictConfig = MagicMock
 
 
 @pytest.fixture(autouse=True)
 def reset_beeref_actions():
     from beeref.actions.actions import actions
+
     for key in list(actions.keys()):
-        if key.startswith('recent_files_'):
+        if key.startswith("recent_files_"):
             actions.pop(key)
 
 
 @pytest.fixture(autouse=True)
 def commandline_args():
-    config_patcher = patch('beeref.view.commandline_args')
+    config_patcher = patch("beeref.view.commandline_args")
     config_mock = config_patcher.start()
     config_mock.filenames = []
     yield config_mock
@@ -38,30 +40,37 @@ def commandline_args():
 @pytest.fixture(autouse=True)
 def settings(tmpdir):
     from beeref.config import BeeSettings
-    dir_patcher = patch('beeref.config.BeeSettings.get_settings_dir',
-                        return_value=tmpdir.dirname)
+
+    dir_patcher = patch(
+        "beeref.config.BeeSettings.get_settings_dir", return_value=str(tmpdir)
+    )
     dir_patcher.start()
     settings = BeeSettings()
+    os.makedirs(os.path.dirname(settings.fileName()), exist_ok=True)
     yield settings
     settings.clear()
     dir_patcher.stop()
 
 
 @pytest.fixture(autouse=True)
-def kbsettings(tmpdir):
+def kbsettings(settings):
     from beeref.config import KeyboardSettings
-    dir_patcher = patch('beeref.config.BeeSettings.get_settings_dir',
-                        return_value=tmpdir.dirname)
-    dir_patcher.start()
+
     kbsettings = KeyboardSettings()
+    for actions in (kbsettings.MOUSEWHEEL_ACTIONS, kbsettings.MOUSE_ACTIONS):
+        for action in actions.values():
+            action.__dict__.pop("kb_settings", None)
     yield kbsettings
     kbsettings.clear()
-    dir_patcher.stop()
+    for actions in (kbsettings.MOUSEWHEEL_ACTIONS, kbsettings.MOUSE_ACTIONS):
+        for action in actions.values():
+            action.__dict__.pop("kb_settings", None)
 
 
 @pytest.fixture
 def main_window(qtbot):
     from beeref.__main__ import BeeRefMainWindow
+
     app = QtWidgets.QApplication.instance()
     main = BeeRefMainWindow(app)
     qtbot.addWidget(main)
@@ -76,12 +85,12 @@ def view(main_window):
 @pytest.fixture
 def imgfilename3x3():
     root = os.path.dirname(__file__)
-    yield os.path.join(root, 'assets', 'test3x3.png')
+    yield os.path.join(root, "assets", "test3x3.png")
 
 
 @pytest.fixture
 def imgdata3x3(imgfilename3x3):
-    with open(imgfilename3x3, 'rb') as f:
+    with open(imgfilename3x3, "rb") as f:
         imgdata3x3 = f.read()
     yield imgdata3x3
 
@@ -94,10 +103,12 @@ def tmpfile(tmpdir):
 @pytest.fixture
 def item():
     from beeref.items import BeePixmapItem
+
     yield BeePixmapItem(QtGui.QImage(10, 10, QtGui.QImage.Format.Format_RGB32))
 
 
 @pytest.fixture(scope="session")
 def qapp():
     from beeref.__main__ import BeeRefApplication
+
     yield BeeRefApplication([])

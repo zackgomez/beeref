@@ -6,28 +6,62 @@ BeeRef currently keeps all image data in memory and writes to the .bee file only
 
 This design introduces a scratch file (working copy) pattern — the same approach Photoshop uses with its scratch disk. The working copy is always reasonably current, Save is cheap, and crash recovery is free.
 
-## File naming
+## Recovery directory
+
+All working copies live in a central recovery directory, not next to the original file:
 
 ```
-file.bee          — the user's file (untouched until Save)
-file.bee.swp      — working copy (always current, unhidden)
+~/.config/BeeRef/recovery/          (Linux)
+%APPDATA%/BeeRef/recovery/          (Windows)
+~/Library/Application Support/BeeRef/recovery/  (macOS)
 ```
 
-The `.swp` extension is unhidden because: works the same on all platforms (no Windows hidden attribute dance), universally recognizable as a temp file, easier to find for manual recovery.
+BeeSettings already knows the config dir — we just add `recovery/` underneath.
 
-The `.swp` file's presence on disk is the crash-recovery signal — on clean exit it's always deleted.
+### Working copy naming
+
+Each .swp is named deterministically from the original path to avoid collisions:
+
+```python
+# /home/zack/Mythos Sync/tributes.bee → recovery/tributes_a1b2c3d4.bee.swp
+stem = Path(original).stem
+path_hash = hashlib.sha256(str(original).encode()).hexdigest()[:8]
+swp_name = f"{stem}_{path_hash}.bee.swp"
+```
+
+For new (unsaved) scenes: `untitled_{timestamp}.bee.swp`
+
+### Benefits over .swp-next-to-file
+
+- Works on read-only filesystems, network drives, removable media
+- No stray files appearing next to user's documents
+- Recovery dir is a single place to scan on startup
+- No filesystem permission issues
 
 ## How it works
 
-### Open
+### Open existing file
 
 1. Read metadata from original .bee file (read-only, fast — items table only, no blobs)
 2. Show placeholders, `fit_scene()`
-3. Background: copy original .bee → `file.bee.swp`
+3. Background: copy original .bee → .swp in recovery dir
 4. Background: VACUUM the working copy (compacts free pages, runs while user is orienting)
 5. When copy finishes: start `ImageLoader` against the working copy
 
-The user sees the layout instantly. The copy overlaps with the user looking at placeholders. By the time they scroll, the copy + VACUUM are likely done and images start loading.
+The user sees the layout instantly. The copy overlaps with the user looking at placeholders.
+
+### New scene (no file)
+
+1. Create empty .swp in recovery dir (`untitled_{timestamp}.bee.swp`)
+2. No copy needed — .swp starts empty
+3. New images written to .swp immediately (get a `save_id` right away)
+4. First Save triggers a Save-As dialog to pick a path
+
+The .swp is the only file until the user saves.
+
+### Read-only file
+
+Same as normal open — the original is never written to anyway. The .swp is in the recovery dir which is always user-writable. Save is disabled (original path is read-only), Save-As works.
 
 ### During operation
 
@@ -41,12 +75,17 @@ Scene is in-memory as today. Changes accumulate in the undo stack. Periodically 
 
 ### Save
 
-1. Final drain (flush any pending changes to working copy)
-2. Copy working copy → temp file in the same directory (`tempfile.NamedTemporaryFile(dir=..., delete=False)`)
-3. `os.replace(temp_file, file.bee)` — atomic swap of the original
-4. Working copy stays intact, we keep operating against it
+```
+Save pressed:
+  if no original path → Save-As dialog (user picks path)
+  elif original is read-only → "File is read-only. Use Save-As."
+  else → drain + copy + atomic rename (below)
+```
 
-The working copy is never moved or invalidated. The original gets atomically replaced by a clean snapshot. The temp file gets a random name (e.g., `tmpx7k2f9.bee`), so no naming collisions. If the copy in step 2 fails or we crash mid-copy, the original is untouched, the working copy is still valid, and the orphaned temp file is harmless.
+1. Final drain (flush pending changes to working copy)
+2. Copy working copy → temp file in the same directory as original (`tempfile.NamedTemporaryFile(dir=..., delete=False)`)
+3. `os.replace(temp_file, original)` — atomic swap
+4. Working copy stays intact, we keep operating against it
 
 ```python
 with tempfile.NamedTemporaryFile(
@@ -56,36 +95,42 @@ with tempfile.NamedTemporaryFile(
 os.replace(tmp.name, bee_path)  # atomic (same filesystem)
 ```
 
+The working copy is never moved or invalidated. If the copy fails or we crash mid-copy, the original is untouched and the working copy is still valid.
+
 ### Save-As
 
 1. Final drain
 2. Copy working copy → new path
-3. Continue operating against the working copy (or switch to a new working copy of the new file)
+3. Rename .swp in recovery dir to match the new path:
+   - Close SQLite connection
+   - `os.rename(old_swp, derive_swp_name(new_path))`
+   - Reopen connection against new .swp path
+4. Continue operating against the renamed working copy
+
+Same rename happens when an untitled scene does its first Save — the `untitled_{timestamp}.bee.swp` becomes `{filename}_{hash}.bee.swp`.
 
 Works with placeholders — blobs are in the working copy's sqlar, not in memory.
-
-### Crash recovery
-
-On open, check for `file.bee.swp`. If it exists:
-- The previous session crashed (or was killed)
-- Offer to recover: "Found unsaved changes from a previous session. Recover?"
-- Yes → open the working copy as the source instead of the original
-- No → delete the working copy, open the original normally
 
 ### Close / New Scene
 
 1. Final drain (if user chose to save)
-2. Delete the working copy (`file.bee.swp`)
+2. Delete the working copy from recovery dir
 3. Clean up ImageLoader and SQLite connections
 
-On clean exit, no `.swp` file remains.
+On clean exit, no .swp file remains in recovery dir.
+
+### Crash recovery
+
+On startup, scan recovery dir for `*.bee.swp` files:
+
+- For each .swp: extract original filename from the stem, show "Recover unsaved changes for {name}?"
+- Yes → open the .swp as the source instead of the original
+- No → delete the .swp
 
 ## Interaction with async loading
 
-The scratch file is the single source for blob reads:
-
 ```
-Original .bee                Working copy (.bee.swp)
+Original .bee                Recovery dir (.bee.swp)
   (read-only)                  (read-write)
       |                              |
   read metadata              copy from original (bg)
@@ -98,7 +143,7 @@ Original .bee                Working copy (.bee.swp)
   Save: ---copy to tmpfile, rename-->  original
 ```
 
-The `ImageLoader` always reads from the working copy. Drains write to the working copy. No contention with the original file after the initial copy.
+The `ImageLoader` always reads from the working copy. Drains write to the working copy. No contention with the original file.
 
 ## SQLite concurrency
 
@@ -110,7 +155,7 @@ SQLite in WAL mode handles this cleanly — concurrent readers + one writer. Wit
 
 ## Disk cost
 
-Temporary 2x file size during operation (original + working copy), plus a brief 3x during Save (original + working copy + temp file). For a 500MB .bee file that's 500MB–1GB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean exit, and the .saving file is transient.
+Temporary 2x file size during operation (original + working copy in recovery dir), plus a brief 3x during Save (original + working copy + temp file). For a 500MB .bee file that's 500MB–1GB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean exit.
 
 ## Future: mip storage
 
@@ -127,9 +172,12 @@ This is a follow-up to the basic placeholder/async loading. The sequence:
    - ImageLoader reads from original file (read-only)
    - Save/Save-As deferred (force-load-all as stopgap)
 2. **Second**: Scratch file
+   - Recovery dir for all working copies
    - ImageLoader reads from working copy
    - Drain replaces explicit save logic
    - Save = drain + copy + atomic rename
    - Save-As = drain + copy
-   - Crash recovery
+   - Crash recovery via recovery dir scan
+   - New scene creates .swp immediately
+   - Read-only files work automatically (Save disabled, Save-As works)
 3. **Third**: Autosave timer + mip caching

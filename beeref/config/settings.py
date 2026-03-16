@@ -229,6 +229,13 @@ class BeeSettings(QtCore.QSettings):
         args = CommandlineArgs()
         return args.settings_dir
 
+    def get_recovery_dir(self):
+        """Return the recovery directory for scratch files, creating if needed."""
+        config_dir = os.path.dirname(self.fileName())
+        recovery_dir = os.path.join(config_dir, "recovery")
+        os.makedirs(recovery_dir, exist_ok=True)
+        return recovery_dir
+
     def update_recent_files(self, filename):
         filename = os.path.abspath(filename)
         values = self.get_recent_files()

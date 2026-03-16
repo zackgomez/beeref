@@ -71,6 +71,11 @@ class BeeRefMainWindow(QtWidgets.QMainWindow):
         assert event is not None
         geom = self.saveGeometry()
         self.view.settings.setValue("MainWindow/geometry", geom)
+        from beeref.fileio.scratch import delete_scratch_file
+
+        if self.view.scene._scratch_file:
+            delete_scratch_file(self.view.scene._scratch_file)
+            self.view.scene._scratch_file = None
         event.accept()
 
     def __del__(self):

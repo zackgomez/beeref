@@ -196,6 +196,9 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
     def clear_scene(self) -> None:
         logger.debug("Clearing scene...")
         self.cancel_active_modes()
+        if self.scene._scratch_file:
+            fileio.delete_scratch_file(self.scene._scratch_file)
+            self.scene._scratch_file = None
         self.scene.clear()
         self.undo_stack.clear()
         self.filename = None

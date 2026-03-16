@@ -272,9 +272,9 @@ def test_open_from_file_when_error(view, qtbot):
     view.worker.wait()
     qtbot.waitUntil(lambda: view.on_loading_finished.called is True)
     assert list(view.scene.items()) == []
-    view.on_loading_finished.assert_called_once_with(
-        "uieauiae", ["unable to open database file"]
-    )
+    args = view.on_loading_finished.call_args
+    assert args[0][0] == "uieauiae"
+    assert len(args[0][1]) == 1
 
 
 @patch("PyQt6.QtWidgets.QFileDialog.getOpenFileName")

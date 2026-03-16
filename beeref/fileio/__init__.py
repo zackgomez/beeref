@@ -20,36 +20,56 @@ from PyQt6 import QtCore
 from beeref import commands
 from beeref.fileio.errors import BeeFileIOError
 from beeref.fileio.image import load_image
+from beeref.fileio.scratch import (
+    create_scratch_file,
+    delete_scratch_file,
+    derive_swp_path,
+    list_recovery_files,
+)
 from beeref.fileio.sql import SQLiteIO, is_bee_file
 from beeref.items import BeePixmapItem
 
 
 __all__ = [
-    'is_bee_file',
-    'load_bee',
-    'save_bee',
-    'load_images',
-    'ThreadedLoader',
-    'BeeFileIOError',
+    "is_bee_file",
+    "load_bee",
+    "save_bee",
+    "load_images",
+    "ThreadedIO",
+    "BeeFileIOError",
+    "create_scratch_file",
+    "delete_scratch_file",
+    "derive_swp_path",
+    "list_recovery_files",
 ]
 
 logger = logging.getLogger(__name__)
 
 
 def load_bee(filename, scene, worker=None):
-    """Load BeeRef native file."""
-    logger.info(f'Loading from file {filename}...')
-    io = SQLiteIO(filename, scene, readonly=True, worker=worker)
+    """Load BeeRef native file via scratch copy."""
+    logger.info(f"Loading from file {filename}...")
+    try:
+        swp = create_scratch_file(filename, worker=worker)
+    except Exception as e:
+        logger.exception(f"Failed to create scratch file for {filename}")
+        if worker:
+            worker.finished.emit(filename, [str(e)])
+            return
+        raise BeeFileIOError(msg=str(e), filename=filename) from e
+    scene._scratch_file = swp
+    io = SQLiteIO(swp, scene, readonly=True, worker=worker)
+    io.filename = filename
     return io.read()
 
 
 def save_bee(filename, scene, create_new=False, worker=None):
     """Save BeeRef native file."""
-    logger.info(f'Saving to file {filename}...')
-    logger.debug(f'Create new: {create_new}')
+    logger.info(f"Saving to file {filename}...")
+    logger.debug(f"Create new: {create_new}")
     io = SQLiteIO(filename, scene, create_new, worker=worker)
     io.write()
-    logger.info('End save')
+    logger.info("End save")
 
 
 def load_images(filenames, pos, scene, worker):
@@ -59,26 +79,25 @@ def load_images(filenames, pos, scene, worker):
     items = []
     worker.begin_processing.emit(len(filenames))
     for i, filename in enumerate(filenames):
-        logger.info(f'Loading image from file {filename}')
+        logger.info(f"Loading image from file {filename}")
         img, filename = load_image(filename)
         worker.progress.emit(i)
         if img.isNull():
-            logger.info(f'Could not load file {filename}')
+            logger.info(f"Could not load file {filename}")
             errors.append(filename)
             continue
 
         item = BeePixmapItem(img, filename)
         item.set_pos_center(pos)
-        scene.add_item_later({'item': item, 'type': 'pixmap'}, selected=True)
+        scene.add_item_later({"item": item, "type": "pixmap"}, selected=True)
         items.append(item)
         if worker.canceled:
             break
         # Give main thread time to process items:
         worker.msleep(10)
 
-    scene.undo_stack.push(
-        commands.InsertItems(scene, items, ignore_first_redo=True))
-    worker.finished.emit('', errors)
+    scene.undo_stack.push(commands.InsertItems(scene, items, ignore_first_redo=True))
+    worker.finished.emit("", errors)
 
 
 class ThreadedIO(QtCore.QThread):
@@ -94,7 +113,7 @@ class ThreadedIO(QtCore.QThread):
         self.func = func
         self.args = args
         self.kwargs = kwargs
-        self.kwargs['worker'] = self
+        self.kwargs["worker"] = self
         self.canceled = False
 
     def run(self):
