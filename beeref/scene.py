@@ -13,10 +13,13 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from functools import partial
 import logging
 import math
 from queue import Queue
+from typing import TYPE_CHECKING, Any, cast
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
@@ -27,6 +30,9 @@ from beeref import commands
 from beeref.config import BeeSettings
 from beeref.items import item_registry, BeeErrorItem, sort_by_filename
 from beeref.selection import MultiSelectItem, RubberbandItem
+
+if TYPE_CHECKING:
+    from beeref.view import BeeGraphicsView
 
 
 logger = logging.getLogger(__name__)
@@ -64,11 +70,11 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         self._clear_ongoing = False
 
     def addItem(self, item):
-        logger.debug(f'Adding item {item}')
+        logger.debug(f"Adding item {item}")
         super().addItem(item)
 
     def removeItem(self, item):
-        logger.debug(f'Removing item {item}')
+        logger.debug(f"Removing item {item}")
         super().removeItem(item)
 
     def cancel_active_modes(self):
@@ -80,7 +86,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
     def end_rubberband_mode(self):
         if self.rubberband_item.scene():
-            logger.debug('Ending rubberband selection')
+            logger.debug("Ending rubberband selection")
             self.removeItem(self.rubberband_item)
         self.active_mode = None
 
@@ -106,7 +112,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         items = self.selectedItems(user_only=True)
         z_values = map(lambda i: i.zValue(), items)
         delta = self.max_z + self.Z_STEP - min(z_values)
-        logger.debug(f'Raise to top, delta: {delta}')
+        logger.debug(f"Raise to top, delta: {delta}")
         for item in items:
             item.setZValue(item.zValue() + delta)
 
@@ -115,7 +121,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         items = self.selectedItems(user_only=True)
         z_values = map(lambda i: i.zValue(), items)
         delta = self.min_z - self.Z_STEP - max(z_values)
-        logger.debug(f'Lower to bottom, delta: {delta}')
+        logger.debug(f"Lower to bottom, delta: {delta}")
 
         for item in items:
             item.setZValue(item.zValue() + delta)
@@ -136,22 +142,21 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         if len(values) < 2:
             return
         avg = sum(values) / len(values)
-        logger.debug(f'Calculated average {mode} {avg}')
+        logger.debug(f"Calculated average {mode} {avg}")
 
         scale_factors = []
         for item in items:
             rect = self.itemsBoundingRect(items=[item])
             scale_factors.append(avg / getattr(rect, mode)())
-        self.undo_stack.push(
-            commands.NormalizeItems(items, scale_factors))
+        self.undo_stack.push(commands.NormalizeItems(items, scale_factors))
 
     def normalize_height(self):
         """Scale selected images to the same height."""
-        return self.normalize_width_or_height('height')
+        return self.normalize_width_or_height("height")
 
     def normalize_width(self):
         """Scale selected images to the same width."""
-        return self.normalize_width_or_height('width')
+        return self.normalize_width_or_height("width")
 
     def normalize_size(self):
         """Scale selected images to the same size.
@@ -170,22 +175,21 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             return
 
         avg = sum(sizes) / len(sizes)
-        logger.debug(f'Calculated average size {avg}')
+        logger.debug(f"Calculated average size {avg}")
 
         scale_factors = []
         for item in items:
             rect = self.itemsBoundingRect(items=[item])
             scale_factors.append(math.sqrt(avg / rect.width() / rect.height()))
-        self.undo_stack.push(
-            commands.NormalizeItems(items, scale_factors))
+        self.undo_stack.push(commands.NormalizeItems(items, scale_factors))
 
     def arrange_default(self):
-        default = self.settings.valueOrDefault('Items/arrange_default')
+        default = self.settings.valueOrDefault("Items/arrange_default")
         MAPPING = {
-            'optimal': self.arrange_optimal,
-            'horizontal': self.arrange,
-            'vertical': partial(self.arrange, vertical=True),
-            'square': self.arrange_square,
+            "optimal": self.arrange_optimal,
+            "horizontal": self.arrange,
+            "vertical": partial(self.arrange, vertical=True),
+            "square": self.arrange_square,
         }
 
         MAPPING[default]()
@@ -199,39 +203,36 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         if len(items) < 2:
             return
 
-        gap = self.settings.valueOrDefault('Items/arrange_gap')
+        gap = self.settings.valueOrDefault("Items/arrange_gap")
         center = self.get_selection_center()
         positions = []
         rects = []
         for item in items:
-            rects.append({
-                'rect': self.itemsBoundingRect(items=[item]),
-                'item': item})
+            rects.append({"rect": self.itemsBoundingRect(items=[item]), "item": item})
 
         if vertical:
-            rects.sort(key=lambda r: r['rect'].topLeft().y())
-            sum_height = sum(map(lambda r: r['rect'].height(), rects))
-            y = round(center.y() - sum_height/2)
+            rects.sort(key=lambda r: r["rect"].topLeft().y())
+            sum_height = sum(map(lambda r: r["rect"].height(), rects))
+            y = round(center.y() - sum_height / 2)
             for rect in rects:
                 positions.append(
-                    QtCore.QPointF(
-                        round(center.x() - rect['rect'].width()/2), y))
-                y += rect['rect'].height() + gap
+                    QtCore.QPointF(round(center.x() - rect["rect"].width() / 2), y)
+                )
+                y += rect["rect"].height() + gap
 
         else:
-            rects.sort(key=lambda r: r['rect'].topLeft().x())
-            sum_width = sum(map(lambda r: r['rect'].width(), rects))
-            x = round(center.x() - sum_width/2)
+            rects.sort(key=lambda r: r["rect"].topLeft().x())
+            sum_width = sum(map(lambda r: r["rect"].width(), rects))
+            x = round(center.x() - sum_width / 2)
             for rect in rects:
                 positions.append(
-                    QtCore.QPointF(
-                        x, round(center.y() - rect['rect'].height()/2)))
-                x += rect['rect'].width() + gap
+                    QtCore.QPointF(x, round(center.y() - rect["rect"].height() / 2))
+                )
+                x += rect["rect"].width() + gap
 
         self.undo_stack.push(
-            commands.ArrangeItems(self,
-                                  [r['item'] for r in rects],
-                                  positions))
+            commands.ArrangeItems(self, [r["item"] for r in rects], positions)
+        )
 
     def arrange_optimal(self):
         self.cancel_active_modes()
@@ -240,13 +241,12 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         if len(items) < 2:
             return
 
-        gap = self.settings.valueOrDefault('Items/arrange_gap')
+        gap = self.settings.valueOrDefault("Items/arrange_gap")
 
         sizes = []
         for item in items:
             rect = self.itemsBoundingRect(items=[item])
-            sizes.append((round(rect.width() + gap),
-                          round(rect.height() + gap)))
+            sizes.append((round(rect.width() + gap), round(rect.height() + gap)))
 
         # The minimal area the items need if they could be packed optimally;
         # we use this as a starting shape for the packing algorithm
@@ -256,8 +256,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         positions = None
         while not positions:
             try:
-                positions = rpack.pack(
-                    sizes, max_width=width, max_height=width)
+                positions = rpack.pack(sizes, max_width=width, max_height=width)
             except rpack.PackingImpossibleError:
                 width = math.ceil(width * 1.2)
 
@@ -265,7 +264,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         # not (0, 0)
         center = self.get_selection_center()
         bounds = rpack.bbox_size(sizes, positions)
-        diff = center - QtCore.QPointF(bounds[0]/2, bounds[1]/2)
+        diff = center - QtCore.QPointF(bounds[0] / 2, bounds[1] / 2)
         positions = [QtCore.QPointF(*pos) + diff for pos in positions]
 
         self.undo_stack.push(commands.ArrangeItems(self, items, positions))
@@ -274,7 +273,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         self.cancel_active_modes()
         max_width = 0
         max_height = 0
-        gap = self.settings.valueOrDefault('Items/arrange_gap')
+        gap = self.settings.valueOrDefault("Items/arrange_gap")
         items = sort_by_filename(self.selectedItems(user_only=True))
 
         if len(items) < 2:
@@ -289,7 +288,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         # not (0, 0)
         num_rows = math.ceil(math.sqrt(len(items)))
         center = self.get_selection_center()
-        diff = center - num_rows/2 * QtCore.QPointF(max_width, max_height)
+        diff = center - num_rows / 2 * QtCore.QPointF(max_width, max_height)
 
         iter_items = iter(items)
         positions = []
@@ -299,8 +298,9 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
                     item = next(iter_items)
                     rect = self.itemsBoundingRect(items=[item])
                     point = QtCore.QPointF(
-                        i * max_width + (max_width - rect.width())/2,
-                        j * max_height + (max_height - rect.height())/2)
+                        i * max_width + (max_width - rect.width()) / 2,
+                        j * max_height + (max_height - rect.height()) / 2,
+                    )
                     positions.append(point + diff)
                 except StopIteration:
                     break
@@ -311,9 +311,12 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         """Flip selected items."""
         self.cancel_active_modes()
         self.undo_stack.push(
-            commands.FlipItems(self.selectedItems(user_only=True),
-                               self.get_selection_center(),
-                               vertical=vertical))
+            commands.FlipItems(
+                self.selectedItems(user_only=True),
+                self.get_selection_center(),
+                vertical=vertical,
+            )
+        )
 
     def crop_items(self):
         """Crop selected item."""
@@ -325,10 +328,11 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             if item.is_image:
                 item.enter_crop_mode()
 
-    def sample_color_at(self, position):
+    def sample_color_at(self, position: QtCore.QPointF) -> QtGui.QColor | None:
         item_at_pos = self.itemAt(position, self.views()[0].transform())
         if item_at_pos:
-            return item_at_pos.sample_color_at(position)
+            return cast(Any, item_at_pos).sample_color_at(position)
+        return None
 
     def select_all_items(self):
         self.cancel_active_modes()
@@ -371,8 +375,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         if event.button() == Qt.MouseButton.LeftButton:
             self.event_start = event.scenePos()
-            item_at_pos = self.itemAt(
-                event.scenePos(), self.views()[0].transform())
+            item_at_pos = self.itemAt(event.scenePos(), self.views()[0].transform())
 
             if self.edit_item:
                 if item_at_pos != self.edit_item:
@@ -393,46 +396,52 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         super().mousePressEvent(event)
 
-    def mouseDoubleClickEvent(self, event):
+    def mouseDoubleClickEvent(
+        self, event: QtWidgets.QGraphicsSceneMouseEvent | None
+    ) -> None:
         self.cancel_active_modes()
+        assert event is not None
         item = self.itemAt(event.scenePos(), self.views()[0].transform())
         if item:
             if not item.isSelected():
                 item.setSelected(True)
-            if item.is_editable:
-                item.enter_edit_mode()
+            bee_item = cast(Any, item)
+            if bee_item.is_editable:
+                bee_item.enter_edit_mode()
                 self.mousePressEvent(event)
             else:
-                self.views()[0].fit_rect(
-                    self.itemsBoundingRect(items=[item]),
-                    toggle_item=item)
+                view = cast("BeeGraphicsView", self.views()[0])
+                view.fit_rect(self.itemsBoundingRect(items=[item]), toggle_item=item)
             return
         super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event):
         if self.active_mode == self.RUBBERBAND_MODE:
             if not self.rubberband_item.scene():
-                logger.debug('Activating rubberband selection')
+                logger.debug("Activating rubberband selection")
                 self.addItem(self.rubberband_item)
                 self.rubberband_item.bring_to_front()
             self.rubberband_item.fit(self.event_start, event.scenePos())
             self.setSelectionArea(self.rubberband_item.shape())
-            self.views()[0].reset_previous_transform()
+            cast("BeeGraphicsView", self.views()[0]).reset_previous_transform()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if self.active_mode == self.RUBBERBAND_MODE:
             self.end_rubberband_mode()
-        if (self.active_mode == self.MOVE_MODE
-                and self.has_selection()
-                and self.multi_select_item.active_mode is None
-                and self.selectedItems()[0].active_mode is None):
+        if (
+            self.active_mode == self.MOVE_MODE
+            and self.has_selection()
+            and self.multi_select_item.active_mode is None
+            and self.selectedItems()[0].active_mode is None
+        ):
             delta = event.scenePos() - self.event_start
             if not delta.isNull():
                 self.undo_stack.push(
-                    commands.MoveItemsBy(self.selectedItems(),
-                                         delta,
-                                         ignore_first_redo=True))
+                    commands.MoveItemsBy(
+                        self.selectedItems(), delta, ignore_first_redo=True
+                    )
+                )
         self.active_mode = None
         super().mouseReleaseEvent(event)
 
@@ -445,24 +454,24 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         items = super().selectedItems()
         if user_only:
-            return list(filter(lambda i: hasattr(i, 'save_id'), items))
+            return list(filter(lambda i: hasattr(i, "save_id"), items))
         return items
 
     def items_by_type(self, itype):
         """Returns all items of the given type."""
 
-        return filter(lambda i: getattr(i, 'TYPE', None) == itype,
-                      self.items())
+        return filter(lambda i: getattr(i, "TYPE", None) == itype, self.items())
 
     def items_for_save(self):
-
         """Returns the items that are to be saved.
 
         Items to be saved are items that have a save_id attribute.
         """
 
-        return filter(lambda i: hasattr(i, 'save_id'),
-                      self.items(order=Qt.SortOrder.AscendingOrder))
+        return filter(
+            lambda i: hasattr(i, "save_id"),
+            self.items(order=Qt.SortOrder.AscendingOrder),
+        )
 
     def clear_save_ids(self):
         for item in self.items_for_save():
@@ -480,7 +489,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         """
 
         def filter_user_items(ilist):
-            return list(filter(lambda i: hasattr(i, 'save_id'), ilist))
+            return list(filter(lambda i: hasattr(i, "save_id"), ilist))
 
         if selection_only:
             base = filter_user_items(self.selectedItems())
@@ -501,8 +510,8 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
                 y.append(corner.y())
 
         return QtCore.QRectF(
-            QtCore.QPointF(min(x), min(y)),
-            QtCore.QPointF(max(x), max(y)))
+            QtCore.QPointF(min(x), min(y)), QtCore.QPointF(max(x), max(y))
+        )
 
     def get_selection_center(self):
         rect = self.itemsBoundingRect(selection_only=True)
@@ -515,7 +524,8 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             return
         if self.has_multi_selection():
             self.multi_select_item.fit_selection_area(
-                self.itemsBoundingRect(selection_only=True))
+                self.itemsBoundingRect(selection_only=True)
+            )
         if self.has_multi_selection() and not self.multi_select_item.scene():
             self.addItem(self.multi_select_item)
             self.multi_select_item.bring_to_front()
@@ -527,10 +537,13 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             # Ignore events while clearing the scene since the
             # multiselect item will get cleared, too
             return
-        if (self.multi_select_item.scene()
-                and self.multi_select_item.active_mode is None):
+        if (
+            self.multi_select_item.scene()
+            and self.multi_select_item.active_mode is None
+        ):
             self.multi_select_item.fit_selection_area(
-                self.itemsBoundingRect(selection_only=True))
+                self.itemsBoundingRect(selection_only=True)
+            )
 
     def add_item_later(self, itemdata, selected=False):
         """Keep an item for adding later via ``add_queued_items``
@@ -546,14 +559,14 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         while not self.items_to_add.empty():
             data, selected = self.items_to_add.get()
-            typ = data.pop('type')
+            typ = data.pop("type")
             cls = item_registry.get(typ)
             if not cls:
                 # Just in case we add new item types in future versions
-                logger.warning(f'Encountered item of unknown type: {typ}')
+                logger.warning(f"Encountered item of unknown type: {typ}")
                 cls = BeeErrorItem
-                data['data'] = {'text': f'Item of unknown type: {typ}'}
-            item = cls.create_from_data(**data)
+                data["data"] = {"text": f"Item of unknown type: {typ}"}
+            item = cast(Any, cls).create_from_data(**data)
             # Set the values common to all item types:
             item.update_from_data(**data)
             self.addItem(item)

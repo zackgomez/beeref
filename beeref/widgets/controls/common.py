@@ -13,61 +13,75 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from functools import partial
+from typing import Any
 
 from PyQt6 import QtWidgets, QtCore
 from PyQt6.QtCore import Qt
 
 from beeref.config import KeyboardSettings
+from beeref.config.controls import MouseConfigBase
 from beeref import constants
+from beeref.utils import ActionList
 
 
 class MouseControlsEditorBase(QtWidgets.QDialog):
     """Common code for MouseWheel and Mouse control editors."""
 
+    layout: QtWidgets.QVBoxLayout
+    actions: ActionList
+
     saved = QtCore.pyqtSignal()
 
-    def init_dialog(self, parent, index, actions, title):
+    def init_dialog(
+        self,
+        parent: QtWidgets.QWidget,
+        index: QtCore.QModelIndex,
+        actions: ActionList,
+        title: str,
+    ) -> None:
         super().__init__(parent)
         self.actions = actions
-        self.action = self.actions[index.row()]
-        self.setWindowTitle(f'title {self.action.text}')
+        self.action: MouseConfigBase = self.actions[index.row()]
+        self.setWindowTitle(f"title {self.action.text}")
         self.old_modifiers = self.action.get_modifiers()
-        self.remove_from_other = None
+        self.remove_from_other: MouseConfigBase | None = None
         self.ignore_on_changed = False
         self.setAutoFillBackground(True)
         self.layout = QtWidgets.QVBoxLayout()
         self.setLayout(self.layout)
         self.setModal(True)
 
-    def init_modifiers_input(self):
-        group = QtWidgets.QGroupBox('Modifiers')
+    def init_modifiers_input(self) -> None:
+        group = QtWidgets.QGroupBox("Modifiers")
         group_layout = QtWidgets.QVBoxLayout()
         group.setLayout(group_layout)
         self.layout.addWidget(group)
-        self.checkboxes = {}
+        self.checkboxes: dict[str, QtWidgets.QCheckBox] = {}
         for mod in self.action.MODIFIER_MAP.keys():
             checkbox = QtWidgets.QCheckBox(mod)
             checkbox.setChecked(mod in self.old_modifiers)
-            checkbox.stateChanged.connect(
-                partial(self.on_modifiers_changed, mod))
+            checkbox.stateChanged.connect(partial(self.on_modifiers_changed, mod))
             self.checkboxes[mod] = checkbox
             group_layout.addWidget(checkbox)
 
-    def init_button_row(self):
+    def init_button_row(self) -> None:
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Cancel
-            | QtWidgets.QDialogButtonBox.StandardButton.Ok)
+            | QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
         buttons.accepted.connect(self.on_save)
         buttons.rejected.connect(self.reject)
         self.layout.addWidget(buttons)
 
-    def set_modifiers_no_modifier(self):
+    def set_modifiers_no_modifier(self) -> None:
         """Check 'No Modifiers', uncheck everything else."""
         for key, checkbox in self.checkboxes.items():
-            checkbox.setChecked(key == 'No Modifier')
+            checkbox.setChecked(key == "No Modifier")
 
-    def on_modifiers_changed(self, modifier, value):
+    def on_modifiers_changed(self, modifier: str, value: int) -> None:
         """Ensure that when 'No Modifiers' is checked, nothing else is
         checked at the same time.
 
@@ -79,37 +93,38 @@ class MouseControlsEditorBase(QtWidgets.QDialog):
         checked = value == Qt.CheckState.Checked.value
         self.ignore_on_changed = True
 
-        if checked and modifier == 'No Modifier':
+        if checked and modifier == "No Modifier":
             self.set_modifiers_no_modifier()
 
-        if checked and modifier != 'No Modifier':
-            self.checkboxes['No Modifier'].setChecked(False)
+        if checked and modifier != "No Modifier":
+            self.checkboxes["No Modifier"].setChecked(False)
 
         if not checked and not self.get_modifiers(cleaned=False):
             self.set_modifiers_no_modifier()
 
         self.ignore_on_changed = False
 
-    def get_modifiers(self, cleaned=True):
-        modifiers = [key for key, checkbox in self.checkboxes.items()
-                     if checkbox.isChecked()]
-        if cleaned and 'No Modifier' in modifiers:
+    def get_modifiers(self, cleaned: bool = True) -> list[str]:
+        modifiers = [
+            key for key, checkbox in self.checkboxes.items() if checkbox.isChecked()
+        ]
+        if cleaned and "No Modifier" in modifiers:
             # In this case the list already should only have the one
             # entry, but just to make sure...
-            return ['No Modifier']
+            return ["No Modifier"]
         return modifiers
 
-    def set_modifiers(self, modifiers):
+    def set_modifiers(self, modifiers: list[str]) -> None:
         for key, checkbox in self.checkboxes.items():
             checkbox.setChecked(key in modifiers)
 
-    def get_temp_action(self):
+    def get_temp_action(self) -> MouseConfigBase:
         raise NotImplementedError  # pragma: no cover
 
-    def reset_inputs(self):
+    def reset_inputs(self) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def on_save(self):
+    def on_save(self) -> None:
         """Don't let users save the same controls on different actions."""
 
         temp = self.get_temp_action()
@@ -118,12 +133,13 @@ class MouseControlsEditorBase(QtWidgets.QDialog):
             if action == self.action:
                 continue
             if action.conflicts_with(temp):
-                msg = ('<p>These controls are already used for:</p>'
-                       f'<p>{action.text}</p>'
-                       '<p>Do you want to remove the other controls'
-                       ' to save these ones?</p>')
-                reply = QtWidgets.QMessageBox.question(
-                    self, 'Save Controls?', msg)
+                msg = (
+                    "<p>These controls are already used for:</p>"
+                    f"<p>{action.text}</p>"
+                    "<p>Do you want to remove the other controls"
+                    " to save these ones?</p>"
+                )
+                reply = QtWidgets.QMessageBox.question(self, "Save Controls?", msg)
                 if reply == QtWidgets.QMessageBox.StandardButton.Yes:
                     self.remove_from_other = action
                     self.accept()
@@ -136,62 +152,78 @@ class MouseControlsEditorBase(QtWidgets.QDialog):
 
 
 class MouseControlsModelBase(QtCore.QAbstractTableModel):
-    COLUMNS = None
+    COLUMNS: tuple[int, ...] = ()
     COL_ACTION = 1
     COL_CHANGED = 2
     COL_BUTTON = 3
     COL_MODIFIERS = 4
     COL_INVERTED = 5
 
-    HEADERS = {
-        COL_ACTION: 'Action',
+    HEADERS: dict[int, str] = {
+        COL_ACTION: "Action",
         COL_CHANGED: constants.CHANGED_SYMBOL,
-        COL_BUTTON: 'Button',
-        COL_MODIFIERS: 'Modifiers',
-        COL_INVERTED: 'Inverted',
+        COL_BUTTON: "Button",
+        COL_MODIFIERS: "Modifiers",
+        COL_INVERTED: "Inverted",
     }
 
-    def __init__(self, actions):
+    def __init__(self, actions: ActionList) -> None:
         super().__init__()
         self.settings = KeyboardSettings()
         self.actions = actions
 
-    def rowCount(self, parent):
+    def rowCount(self, parent: QtCore.QModelIndex | None = None) -> int:
         return len(self.actions)
 
-    def columnCount(self, parent):
+    def columnCount(self, parent: QtCore.QModelIndex | None = None) -> int:
         return len(self.COLUMNS)
 
-    def headerData(self, section, orientation, role):
-        if (role == QtCore.Qt.ItemDataRole.DisplayRole
-                and orientation == QtCore.Qt.Orientation.Horizontal):
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
+    ) -> str | None:
+        if (
+            role == QtCore.Qt.ItemDataRole.DisplayRole
+            and orientation == QtCore.Qt.Orientation.Horizontal
+        ):
             key = self.COLUMNS[section]
             return self.HEADERS[key]
+        return None
 
-    def flags(self, index):
+    def flags(self, index: QtCore.QModelIndex) -> Qt.ItemFlag:
         key = self.COLUMNS[index.column()]
-        base = (QtCore.Qt.ItemFlag.ItemIsEnabled
-                | QtCore.Qt.ItemFlag.ItemNeverHasChildren)
+        base = (
+            QtCore.Qt.ItemFlag.ItemIsEnabled | QtCore.Qt.ItemFlag.ItemNeverHasChildren
+        )
 
         if key in (self.COL_ACTION, self.COL_CHANGED):
             return base
         elif key in (self.COL_BUTTON, self.COL_MODIFIERS):
-            return (base | QtCore.Qt.ItemFlag.ItemIsEditable)
+            return base | QtCore.Qt.ItemFlag.ItemIsEditable
         elif key == self.COL_INVERTED:
             action = self.actions[index.row()]
             if action.invertible and action.is_configured():
-                return (base
-                        | QtCore.Qt.ItemFlag.ItemIsEditable
-                        | QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+                return (
+                    base
+                    | QtCore.Qt.ItemFlag.ItemIsEditable
+                    | QtCore.Qt.ItemFlag.ItemIsUserCheckable
+                )
             else:
                 return base
+        return base
 
-    def data(self, index, role):
+    def data(
+        self, index: QtCore.QModelIndex, role: int = Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         key = self.COLUMNS[index.column()]
         action = self.actions[index.row()]
 
-        if role in (QtCore.Qt.ItemDataRole.DisplayRole,
-                    QtCore.Qt.ItemDataRole.EditRole):
+        if role in (
+            QtCore.Qt.ItemDataRole.DisplayRole,
+            QtCore.Qt.ItemDataRole.EditRole,
+        ):
             if key == self.COL_ACTION:
                 return action.text
             if key == self.COL_CHANGED and action.controls_changed():
@@ -199,50 +231,62 @@ class MouseControlsModelBase(QtCore.QAbstractTableModel):
             if key == self.COL_BUTTON:
                 return action.get_button()
             if key == self.COL_MODIFIERS:
-                return ' + '.join(action.get_modifiers())
+                return " + ".join(action.get_modifiers())
             if key == self.COL_INVERTED:
                 if not action.is_configured() or not action.invertible:
                     return None
-                return 'Yes' if action.get_inverted() else 'No'
+                return "Yes" if action.get_inverted() else "No"
 
         if role == QtCore.Qt.ItemDataRole.ToolTipRole:
             changed = action.controls_changed()
             if not changed:
                 return
             if key == self.COL_CHANGED:
-                return 'Changed from default'
+                return "Changed from default"
             if key == self.COL_BUTTON:
-                if action.button == 'Not Configured':
-                    default = 'Not configured'
+                if action.button == "Not Configured":
+                    default = "Not configured"
                 else:
                     default = action.button
-                return f'Default: {default}'
+                return f"Default: {default}"
             if key == self.COL_MODIFIERS:
                 if not action.modifiers:
-                    default = 'Not configured'
+                    default = "Not configured"
                 else:
-                    default = ' + '.join(action.modifiers)
-                return f'Default: {default}'
+                    default = " + ".join(action.modifiers)
+                return f"Default: {default}"
             if key == self.COL_INVERTED and action.invertible:
-                default = 'Yes' if action.inverted else 'No'
-                return f'Default: {default}'
+                default = "Yes" if action.inverted else "No"
+                return f"Default: {default}"
 
         if role == QtCore.Qt.ItemDataRole.CheckStateRole:
-            if (key == self.COL_INVERTED
-                    and action.is_configured()
-                    and action.invertible):
-                return (Qt.CheckState.Checked if action.get_inverted()
-                        else Qt.CheckState.Unchecked)
+            if (
+                key == self.COL_INVERTED
+                and action.is_configured()
+                and action.invertible
+            ):
+                return (
+                    Qt.CheckState.Checked
+                    if action.get_inverted()
+                    else Qt.CheckState.Unchecked
+                )
 
-    def set_data_on_action(self, action, value):
+        return None
+
+    def set_data_on_action(self, action: Any, value: Any) -> None:
         raise NotImplementedError  # pragma: no cover
 
-    def setData(self, index, value, role, remove_from_other=None):
+    def setData(
+        self,
+        index: QtCore.QModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.EditRole,
+        remove_from_other: Any = None,
+    ) -> bool:
         key = self.COLUMNS[index.column()]
         action = self.actions[index.row()]
         if key == self.COL_INVERTED:
-            action.set_inverted(
-                True if value == Qt.CheckState.Checked.value else False)
+            action.set_inverted(True if value == Qt.CheckState.Checked.value else False)
         else:
             self.set_data_on_action(action, value)
             if remove_from_other:
@@ -251,12 +295,13 @@ class MouseControlsModelBase(QtCore.QAbstractTableModel):
                 remove_from_other.remove_controls()
                 row = list(self.actions.keys()).index(remove_from_other.id)
                 self.dataChanged.emit(
-                    self.index(row, 0),
-                    self.index(row, self.columnCount(None) - 1))
+                    self.index(row, 0), self.index(row, self.columnCount(None) - 1)
+                )
 
         # Whole row might be affected, so excpliclity emit dataChanged
         self.dataChanged.emit(
             self.index(index.row(), 0),
-            self.index(index.row(), self.columnCount(None) - 1))
+            self.index(index.row(), self.columnCount(None) - 1),
+        )
 
         return True

@@ -14,7 +14,6 @@
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
 import base64
-import logging
 import pathlib
 from xml.etree import ElementTree as ET
 
@@ -23,9 +22,10 @@ from PyQt6 import QtCore, QtGui
 from .errors import BeeFileIOError
 from beeref import widgets
 from beeref.items import BeePixmapItem
+from beeref.logging import getLogger
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class ExporterRegistry(dict):

@@ -49,6 +49,7 @@ dev = [
     # -r build.txt
     "pyinstaller==6.6.0",
     # Dev-only
+    "lxml-stubs>=0.5.1",
     "ruff>=0.4.0",
     "pybadges==3.0.1",
     "yamllint==1.35.1",
@@ -63,3 +64,6 @@ Repository = "https://github.com/rbreu/beeref"
 # Documentation =
 Issues = "https://github.com/rbreu/beeref/issues"
 Changelog = "https://github.com/rbreu/beeref/blob/main/CHANGELOG.rst"
+
+[tool.ty.rules]
+invalid-method-override = "ignore"

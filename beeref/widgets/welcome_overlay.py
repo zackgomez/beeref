@@ -13,6 +13,8 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
 
 from PyQt6 import QtGui, QtWidgets
@@ -41,17 +43,18 @@ class WelcomeOverlay(QtWidgets.QWidget):
         self.update_background_color()
 
     def update_background_color(self):
-        canvas_color = BeeSettings().valueOrDefault('View/canvas_color')
+        canvas_color = BeeSettings().valueOrDefault("View/canvas_color")
         palette = self.palette()
         palette.setColor(self.backgroundRole(), QtGui.QColor(canvas_color))
         self.setPalette(palette)
 
         # Help text
         self.label = QtWidgets.QLabel(self.txt, self)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignVCenter
-                                | Qt.AlignmentFlag.AlignCenter)
-        self.layout = QtWidgets.QHBoxLayout()
-        self.layout.addStretch(50)
-        self.layout.addWidget(self.label)
-        self.layout.addStretch(50)
-        self.setLayout(self.layout)
+        self.label.setAlignment(
+            Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignCenter
+        )
+        lyt = QtWidgets.QHBoxLayout()
+        lyt.addStretch(50)
+        lyt.addWidget(self.label)
+        lyt.addStretch(50)
+        self.setLayout(lyt)

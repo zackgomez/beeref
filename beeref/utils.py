@@ -33,18 +33,20 @@ def create_palette_from_dict(conf):
 
     palette = QtGui.QPalette()
     for key, value in conf.items():
-        group, role = key.split(':')
+        group, role = key.split(":")
         if hasattr(QtGui.QPalette.ColorGroup, group):
             palette.setColor(
                 getattr(QtGui.QPalette.ColorGroup, group),
                 getattr(QtGui.QPalette.ColorRole, role),
-                QtGui.QColor(*value))
-            if group == 'Active':
+                QtGui.QColor(*value),
+            )
+            if group == "Active":
                 # Also set the Inactive colour group.
                 palette.setColor(
                     QtGui.QPalette.ColorGroup.Inactive,
                     getattr(QtGui.QPalette.ColorRole, role),
-                    QtGui.QColor(*value))
+                    QtGui.QColor(*value),
+                )
 
     return palette
 
@@ -53,12 +55,10 @@ def get_rect_from_points(point1, point2):
     """Constructs a QRectF from the given QPointF. The points can be *any*
     two opposing corners of the rectangle."""
 
-    topleft = QtCore.QPointF(
-        min(point1.x(), point2.x()),
-        min(point1.y(), point2.y()))
+    topleft = QtCore.QPointF(min(point1.x(), point2.x()), min(point1.y(), point2.y()))
     bottomright = QtCore.QPointF(
-        max(point1.x(), point2.x()),
-        max(point1.y(), point2.y()))
+        max(point1.x(), point2.x()), max(point1.y(), point2.y())
+    )
     return QtCore.QRectF(topleft, bottomright)
 
 
@@ -76,9 +76,11 @@ def get_file_extension_from_format(formatstr):
     e.g. 'JPEG (*.jpg *.jpeg)' yields 'jpg'.
     """
 
-    extensions = re.match(r'.* \((.*)\)', formatstr).groups()[0]
+    m = re.match(r".* \((.*)\)", formatstr)
+    assert m is not None
+    extensions = m.groups()[0]
     ext = extensions.split()[0]
-    return ext.removeprefix('*.')
+    return ext.removeprefix("*.")
 
 
 def qcolor_to_hex(color):
@@ -92,12 +94,11 @@ def qcolor_to_hex(color):
     # The name method can only do HexRgb and HexArgb, not HexRgba, so
     # we have to do this ourselves:
     rgb = color.name()
-    alpha = hex(color.alpha()).removeprefix('0x')
-    return f'{rgb}{alpha}'
+    alpha = hex(color.alpha()).removeprefix("0x")
+    return f"{rgb}{alpha}"
 
 
 class ActionList(OrderedDict):
-
     def __init__(self, actions):
         super().__init__()
         for action in actions:

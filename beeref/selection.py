@@ -17,9 +17,10 @@
 
 from __future__ import annotations
 
-import logging
 import math
 from typing import TYPE_CHECKING, Any, cast
+
+from beeref.logging import getLogger
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
@@ -41,7 +42,7 @@ else:
 
 
 commandline_args = CommandlineArgs()
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 SELECT_COLOR = QtGui.QColor(*COLORS["Scene:Selection"])
 
 

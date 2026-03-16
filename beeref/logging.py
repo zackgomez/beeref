@@ -13,24 +13,30 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
 import logging.handlers
 import os.path
+from typing import Any, cast
 
 from PyQt6 import QtCore
 
 
-logging.TRACE = 5
+TRACE = 5
 
 
 class BeeLogger(logging.Logger):
-
-    def __init__(self, name, level=logging.NOTSET):
+    def __init__(self, name: str, level: int = logging.NOTSET) -> None:
         super().__init__(name, level)
-        logging.addLevelName(logging.TRACE, 'TRACE')
+        logging.addLevelName(TRACE, "TRACE")
 
-    def trace(self, msg, *args, **kwargs):
-        self.log(logging.TRACE, msg, *args, **kwargs)
+    def trace(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self.log(TRACE, msg, *args, **kwargs)
+
+
+def getLogger(name: str) -> BeeLogger:
+    return cast(BeeLogger, logging.getLogger(name))
 
 
 logging.setLoggerClass(BeeLogger)
@@ -44,7 +50,7 @@ class BeeRotatingFileHandler(logging.handlers.RotatingFileHandler):
         super().__init__(filename, **kwargs)
 
 
-qtlogger = logging.getLogger('Qt')
+qtlogger = logging.getLogger("Qt")
 
 
 def qt_message_handler(mode, context, message):
@@ -56,7 +62,9 @@ def qt_message_handler(mode, context, message):
         QtCore.QtMsgType.QtFatalMsg: qtlogger.fatal,
     }
     if context and (context.file or context.line or context.function):
-        message = (f'{message}: File {context.file}, line {context.line}, '
-                   f'in {context.function}')
+        message = (
+            f"{message}: File {context.file}, line {context.line}, "
+            f"in {context.function}"
+        )
 
     logfuncs[mode](message)

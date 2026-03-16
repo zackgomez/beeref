@@ -36,6 +36,7 @@ build = [
 dev = [
     { name = "coverage" },
     { name = "httpretty" },
+    { name = "lxml-stubs" },
     { name = "pybadges" },
     { name = "pyinstaller" },
     { name = "pytest" },
@@ -59,6 +60,7 @@ requires-dist = [
     { name = "httpretty", marker = "extra == 'dev'", specifier = "==1.1.4" },
     { name = "httpretty", marker = "extra == 'test'", specifier = "==1.1.4" },
     { name = "lxml", specifier = "==5.1.0" },
+    { name = "lxml-stubs", marker = "extra == 'dev'", specifier = ">=0.5.1" },
     { name = "mistune", specifier = ">=3.0.0" },
     { name = "pillow", specifier = ">=10.0.0" },
     { name = "pybadges", marker = "extra == 'dev'", specifier = "==3.0.1" },
@@ -350,6 +352,15 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/a2/58/7e2f85b8d95430023eea8e4ced2bc6a6763e46dbb0ac0f1c2f23f579b404/lxml-5.1.0-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:8b9f19df998761babaa7f09e6bc169294eefafd6149aaa272081cbddc7ba4ca3", size = 4078405, upload-time = "2024-01-08T08:33:20.094Z" },
     { url = "https://files.pythonhosted.org/packages/b0/3d/4ca69cae3a7999012f6e5a86c900b4fc8ec26f9d0254ed32c93b7731b1b4/lxml-5.1.0-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5e53d7e6a98b64fe54775d23a7c669763451340c3d44ad5e3a3b48a1efbdc96f", size = 6437029, upload-time = "2024-01-08T08:33:23.483Z" },
     { url = "https://files.pythonhosted.org/packages/1a/73/cfd66d2d314eb5afa6b117673924abbf0bc1c650e85da3a87087c65ba8a4/lxml-5.1.0-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:c3cd1fc1dc7c376c54440aeaaa0dcc803d2126732ff5c6b68ccd619f2e64be4f", size = 3497571, upload-time = "2024-01-08T08:33:27.167Z" },
+]
+
+[[package]]
+name = "lxml-stubs"
+version = "0.5.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/99/da/1a3a3e5d159b249fc2970d73437496b908de8e4716a089c69591b4ffa6fd/lxml-stubs-0.5.1.tar.gz", hash = "sha256:e0ec2aa1ce92d91278b719091ce4515c12adc1d564359dfaf81efa7d4feab79d", size = 14778, upload-time = "2024-01-10T09:37:46.521Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1f/c9/e0f8e4e6e8a69e5959b06499582dca6349db6769cc7fdfb8a02a7c75a9ae/lxml_stubs-0.5.1-py3-none-any.whl", hash = "sha256:1f689e5dbc4b9247cb09ae820c7d34daeb1fdbd1db06123814b856dae7787272", size = 13584, upload-time = "2024-01-10T09:37:44.931Z" },
 ]
 
 [[package]]

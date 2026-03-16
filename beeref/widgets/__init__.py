@@ -13,8 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from importlib.resources import files as rsc_files
 import logging
+from typing import Optional
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
@@ -33,10 +36,9 @@ logger = logging.getLogger(__name__)
 
 
 class BeeProgressDialog(QtWidgets.QProgressDialog):
-
     def __init__(self, label, worker, maximum=0, parent=None):
-        super().__init__(label, 'Cancel', 0, maximum, parent=parent)
-        logger.debug('Initialised progress bar')
+        super().__init__(label, "Cancel", 0, maximum, parent=parent)
+        logger.debug("Initialised progress bar")
         self.setMinimumDuration(0)
         self.setWindowModality(Qt.WindowModality.WindowModal)
         self.setAutoReset(False)
@@ -48,15 +50,15 @@ class BeeProgressDialog(QtWidgets.QProgressDialog):
         self.canceled.connect(worker.on_canceled)
 
     def on_progress(self, value):
-        logger.debug(f'Progress dialog: {value}')
+        logger.debug(f"Progress dialog: {value}")
         self.setValue(value)
 
     def on_begin_processing(self, value):
-        logger.debug(f'Beginn progress dialog: {value}')
+        logger.debug(f"Beginn progress dialog: {value}")
         self.setMaximum(value)
 
     def on_finished(self, *args, **kwargs):
-        logger.debug('Finished progress dialog')
+        logger.debug("Finished progress dialog")
         self.setValue(self.maximum())
         self.reset()
         self.hide()
@@ -66,20 +68,22 @@ class BeeProgressDialog(QtWidgets.QProgressDialog):
 class HelpDialog(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle(f'{constants.APPNAME} Help')
+        self.setWindowTitle(f"{constants.APPNAME} Help")
 
         tabs = QtWidgets.QTabWidget()
 
         # Controls
-        controls_txt = rsc_files(
-            'beeref.documentation').joinpath('controls.html').read_text()
+        controls_txt = (
+            rsc_files("beeref.documentation").joinpath("controls.html").read_text()
+        )
         controls_label = QtWidgets.QLabel(controls_txt)
         controls_label.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setWidget(controls_label)
-        tabs.addTab(scroll, '&Controls')
+        tabs.addTab(scroll, "&Controls")
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
@@ -87,7 +91,8 @@ class HelpDialog(QtWidgets.QDialog):
 
         # Bottom row of buttons
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Close)
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
@@ -97,7 +102,7 @@ class HelpDialog(QtWidgets.QDialog):
 class DebugLogDialog(QtWidgets.QDialog):
     def __init__(self, parent):
         super().__init__(parent)
-        self.setWindowTitle(f'{constants.APPNAME} Debug Log')
+        self.setWindowTitle(f"{constants.APPNAME} Debug Log")
         with open(logfile_name()) as f:
             self.log_txt = f.read()
 
@@ -105,18 +110,21 @@ class DebugLogDialog(QtWidgets.QDialog):
         self.log.setReadOnly(True)
 
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Close)
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
         buttons.rejected.connect(self.reject)
-        self.copy_button = QtWidgets.QPushButton('Co&py To Clipboard')
+        self.copy_button = QtWidgets.QPushButton("Co&py To Clipboard")
         self.copy_button.released.connect(self.copy_to_clipboard)
         buttons.addButton(
-            self.copy_button, QtWidgets.QDialogButtonBox.ButtonRole.ActionRole)
+            self.copy_button, QtWidgets.QDialogButtonBox.ButtonRole.ActionRole
+        )
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
         name_widget = QtWidgets.QLabel(logfile_name())
         name_widget.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         layout.addWidget(name_widget)
         layout.addWidget(self.log)
         layout.addWidget(buttons)
@@ -124,6 +132,7 @@ class DebugLogDialog(QtWidgets.QDialog):
 
     def copy_to_clipboard(self):
         clipboard = QtWidgets.QApplication.clipboard()
+        assert clipboard is not None
         clipboard.setText(self.log_txt)
 
 
@@ -134,19 +143,21 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
     def __init__(self, parent, default_size):
         super().__init__(parent)
         self.default_size = default_size
-        if (self.default_size.width() > self.MAX_SIZE
-                or self.default_size.width() >= self.MAX_SIZE):
+        if (
+            self.default_size.width() > self.MAX_SIZE
+            or self.default_size.width() >= self.MAX_SIZE
+        ):
             self.default_size.scale(
-                self.MAX_SIZE, self.MAX_SIZE,
-                Qt.AspectRatioMode.KeepAspectRatio)
+                self.MAX_SIZE, self.MAX_SIZE, Qt.AspectRatioMode.KeepAspectRatio
+            )
 
         self.ignore_change = False
-        self.setWindowTitle('Export Scene to Image')
+        self.setWindowTitle("Export Scene to Image")
         self.setWindowModality(Qt.WindowModality.WindowModal)
         layout = QtWidgets.QGridLayout()
         self.setLayout(layout)
 
-        width_label = QtWidgets.QLabel('Width:')
+        width_label = QtWidgets.QLabel("Width:")
         layout.addWidget(width_label, 0, 0)
         self.width_input = QtWidgets.QSpinBox()
         self.width_input.setRange(self.MIN_SIZE, self.MAX_SIZE)
@@ -154,7 +165,7 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
         self.width_input.valueChanged.connect(self.on_width_changed)
         layout.addWidget(self.width_input, 0, 1)
 
-        height_label = QtWidgets.QLabel('Height:')
+        height_label = QtWidgets.QLabel("Height:")
         layout.addWidget(height_label, 1, 0)
         self.height_input = QtWidgets.QSpinBox()
         self.height_input.setMinimum(10)
@@ -165,8 +176,9 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
 
         # Bottom row of buttons
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok |
-            QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
 
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -176,7 +188,8 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
         if not self.ignore_change:
             self.ignore_change = True
             new = self.default_size.scaled(
-                width, self.MAX_SIZE, Qt.AspectRatioMode.KeepAspectRatio)
+                width, self.MAX_SIZE, Qt.AspectRatioMode.KeepAspectRatio
+            )
             self.height_input.setValue(new.height())
             self.ignore_change = False
 
@@ -184,17 +197,16 @@ class SceneToPixmapExporterDialog(QtWidgets.QDialog):
         if not self.ignore_change:
             self.ignore_change = True
             new = self.default_size.scaled(
-                self.MAX_SIZE, height, Qt.AspectRatioMode.KeepAspectRatio)
+                self.MAX_SIZE, height, Qt.AspectRatioMode.KeepAspectRatio
+            )
             self.width_input.setValue(new.width())
             self.ignore_change = False
 
     def value(self):
-        return QtCore.QSize(self.width_input.value(),
-                            self.height_input.value())
+        return QtCore.QSize(self.width_input.value(), self.height_input.value())
 
 
 class ChangeOpacityDialog(QtWidgets.QDialog):
-
     def __init__(self, parent, images, undo_stack):
         super().__init__(parent)
         self.undo_stack = undo_stack
@@ -203,12 +215,12 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
 
         value = int(images[0].opacity() * 100) if images else 100
 
-        self.setWindowTitle('Change Opacity:')
+        self.setWindowTitle("Change Opacity:")
         self.setWindowModality(Qt.WindowModality.WindowModal)
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        self.label = QtWidgets.QLabel('Opacity:')
+        self.label = QtWidgets.QLabel("Opacity:")
         layout.addWidget(self.label)
 
         self.input = QtWidgets.QSlider(Qt.Orientation.Horizontal)
@@ -219,8 +231,9 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
 
         # Bottom row of buttons
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok |
-            QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
 
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
@@ -229,13 +242,13 @@ class ChangeOpacityDialog(QtWidgets.QDialog):
         self.show()
 
     def on_value_changed(self, value):
-        self.label.setText(f'Opacity: {value}%')
+        self.label.setText(f"Opacity: {value}%")
         self.command.opacity = value / 100
         self.command.redo()
 
     def accept(self):
         if self.images:
-            logger.debug(f'Setting opacity to {self.command.opacity}')
+            logger.debug(f"Setting opacity to {self.command.opacity}")
             self.command.ignore_first_redo = True
             self.undo_stack.push(self.command)
         return super().accept()
@@ -249,17 +262,18 @@ class BeeNotification(QtWidgets.QWidget):
     def __init__(self, parent, text):
         super().__init__(parent)
         self.label = QtWidgets.QLabel(text)
-        self.setObjectName('BeeNotification')
+        self.setObjectName("BeeNotification")
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self.setAutoFillBackground(True)
         layout = QtWidgets.QVBoxLayout()
         layout.addWidget(self.label)
         self.setLayout(layout)
-        color = constants.COLORS['Active:Window']
+        color = constants.COLORS["Active:Window"]
         self.setStyleSheet(
-            f'background-color: rgba({color[0]}, {color[1]}, {color[2]}, 0.9);'
-            'padding: 0.7em;'
-            'border-radius: 5px;')
+            f"background-color: rgba({color[0]}, {color[1]}, {color[2]}, 0.9);"
+            "padding: 0.7em;"
+            "border-radius: 5px;"
+        )
         self.show()
         # We only get own width after showing it;
         # updateGeometry doesn't work on hidden widgets
@@ -270,7 +284,6 @@ class BeeNotification(QtWidgets.QWidget):
 
 
 class SampleColorWidget(QtWidgets.QWidget):
-
     OFFSET = 10  # Offset from mouse pointer
     SIZE = 50
     NONE_COLOR = QtGui.QColor(0, 0, 0, 0)
@@ -282,52 +295,53 @@ class SampleColorWidget(QtWidgets.QWidget):
         self.show()
 
     def set_pos(self, pos):
-        self.setGeometry(int(pos.x() + self.OFFSET),
-                         int(pos.y() + self.OFFSET),
-                         self.SIZE, self.SIZE)
+        self.setGeometry(
+            int(pos.x() + self.OFFSET), int(pos.y() + self.OFFSET), self.SIZE, self.SIZE
+        )
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: Optional[QtGui.QPaintEvent]) -> None:
         color = self.color if self.color else self.NONE_COLOR
         painter = QtGui.QPainter(self)
         painter.setBrush(QtGui.QBrush(color))
         painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, self.SIZE, self.SIZE)
 
-    def update(self, pos, color):
+    def update_sample(self, pos: QtCore.QPointF, color: QtGui.QColor | None) -> None:
         self.set_pos(pos)
         self.color = color
         self.repaint()
 
 
 class ExportImagesFileExistsDialog(QtWidgets.QDialog):
-
     def __init__(self, parent, filename):
         super().__init__(parent)
-        self.setWindowTitle('File exists')
+        self.setWindowTitle("File exists")
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
 
-        label = QtWidgets.QLabel(
-            f'File already exists:\n{filename}')
+        label = QtWidgets.QLabel(f"File already exists:\n{filename}")
         layout.addWidget(label)
 
-        choices = (('skip', 'Skip this file'),
-                   ('skip_all', 'Skip all existing files'),
-                   ('overwrite', 'Overwrite this file'),
-                   ('overwrite_all', 'Overwrite all existing files'))
+        choices = (
+            ("skip", "Skip this file"),
+            ("skip_all", "Skip all existing files"),
+            ("overwrite", "Overwrite this file"),
+            ("overwrite_all", "Overwrite all existing files"),
+        )
 
         self.radio_buttons = {}
-        for (value, label) in choices:
+        for value, label in choices:
             btn = QtWidgets.QRadioButton(label)
             self.radio_buttons[value] = btn
             layout.addWidget(btn)
-        self.radio_buttons['skip'].setChecked(True)
+        self.radio_buttons["skip"].setChecked(True)
 
         # Bottom row of buttons
         buttons = QtWidgets.QDialogButtonBox(
             QtWidgets.QDialogButtonBox.StandardButton.Ok
-            | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel
+        )
         buttons.rejected.connect(self.reject)
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)

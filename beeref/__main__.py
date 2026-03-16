@@ -15,13 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
 import os
 import platform
 import signal
 import sys
+from typing import Any, Optional, cast
 
-from PyQt6 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from beeref import constants
 from beeref.assets import BeeAssets
@@ -33,12 +36,12 @@ logger = logging.getLogger(__name__)
 
 
 class BeeRefApplication(QtWidgets.QApplication):
-
-    def event(self, event):
+    def event(self, event: Optional[QtCore.QEvent]) -> bool:
+        assert event is not None
         if event.type() == QtCore.QEvent.Type.FileOpen:
             for widget in self.topLevelWidgets():
                 if isinstance(widget, BeeRefMainWindow):
-                    widget.view.open_from_file(event.file())
+                    widget.view.open_from_file(cast(Any, event).file())
                     return True
             return False
         else:
@@ -46,7 +49,6 @@ class BeeRefApplication(QtWidgets.QApplication):
 
 
 class BeeRefMainWindow(QtWidgets.QMainWindow):
-
     def __init__(self, app):
         super().__init__()
         app.setOrganizationName(constants.APPNAME)
@@ -55,7 +57,7 @@ class BeeRefMainWindow(QtWidgets.QMainWindow):
         self.setWindowFlag(QtCore.Qt.WindowType.FramelessWindowHint)
         self.view = BeeGraphicsView(app, self)
         default_window_size = QtCore.QSize(500, 300)
-        geom = self.view.settings.value('MainWindow/geometry')
+        geom = self.view.settings.value("MainWindow/geometry")
         if geom is None:
             self.resize(default_window_size)
         else:
@@ -64,9 +66,10 @@ class BeeRefMainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.view)
         self.show()
 
-    def closeEvent(self, event):
+    def closeEvent(self, event: Optional[QtGui.QCloseEvent]) -> None:
+        assert event is not None
         geom = self.saveGeometry()
-        self.view.settings.setValue('MainWindow/geometry', geom)
+        self.view.settings.setValue("MainWindow/geometry", geom)
         event.accept()
 
     def __del__(self):
@@ -78,22 +81,23 @@ def safe_timer(timeout, func, *args, **kwargs):
     overlapping calls.
     See: http://ralsina.me/weblog/posts/BB974.html
     """
+
     def timer_event():
         try:
             func(*args, **kwargs)
         finally:
             QtCore.QTimer.singleShot(timeout, timer_event)
+
     QtCore.QTimer.singleShot(timeout, timer_event)
 
 
 def handle_sigint(signum, frame):
-    logger.info('Received interrupt. Exiting...')
+    logger.info("Received interrupt. Exiting...")
     QtWidgets.QApplication.quit()
 
 
 def handle_uncaught_exception(exc_type, exc, traceback):
-    logger.critical('Unhandled exception',
-                    exc_info=(exc_type, exc, traceback))
+    logger.critical("Unhandled exception", exc_info=(exc_type, exc, traceback))
     QtWidgets.QApplication.quit()
 
 
@@ -101,13 +105,13 @@ sys.excepthook = handle_uncaught_exception
 
 
 def main():
-    logger.info(f'Starting {constants.APPNAME} version {constants.VERSION}')
-    logger.debug('System: %s', ' '.join(platform.uname()))
-    logger.debug('Python: %s', platform.python_version())
-    logger.debug('LD_LIBRARY_PATH: %s', os.environ.get('LD_LIBRARY_PATH'))
+    logger.info(f"Starting {constants.APPNAME} version {constants.VERSION}")
+    logger.debug("System: %s", " ".join(platform.uname()))
+    logger.debug("Python: %s", platform.python_version())
+    logger.debug("LD_LIBRARY_PATH: %s", os.environ.get("LD_LIBRARY_PATH"))
     settings = BeeSettings()
-    logger.info(f'Using settings: {settings.fileName()}')
-    logger.info(f'Logging to: {logfile_name()}')
+    logger.info(f"Using settings: {settings.fileName()}")
+    logger.info(f"Logging to: {logfile_name()}")
     settings.on_startup()
     args = CommandlineArgs(with_check=True)  # Force checking
     assert not args.debug_raise_error, args.debug_raise_error
@@ -126,9 +130,9 @@ def main():
     app.exec()
     del bee
     del app
-    logger.debug('BeeRef closed')
+    logger.debug("BeeRef closed")
     QtCore.qInstallMessageHandler(None)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()  # pragma: no cover

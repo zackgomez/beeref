@@ -13,10 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from functools import partial
 import logging
+from typing import Any, cast
 
 from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtCore import Qt
 
 from beeref.config import KeyboardSettings, settings_events
 from beeref.config.controls import MouseConfig
@@ -30,13 +34,15 @@ logger = logging.getLogger(__name__)
 
 
 class MouseControlsEditor(MouseControlsEditorBase):
+    action: MouseConfig
 
-    def __init__(self, parent, index):
-        self.init_dialog(parent, index, KeyboardSettings.MOUSE_ACTIONS,
-                         'Mouse Controls for:')
+    def __init__(self, parent: QtWidgets.QWidget, index: QtCore.QModelIndex) -> None:
+        self.init_dialog(
+            parent, index, KeyboardSettings.MOUSE_ACTIONS, "Mouse Controls for:"
+        )
         self.old_button = self.action.get_button()
 
-        self.layout.addWidget(QtWidgets.QLabel('Mouse Button:'))
+        self.layout.addWidget(QtWidgets.QLabel("Mouse Button:"))
         self.button_input = QtWidgets.QComboBox(parent=parent)
         self.button_input.insertItems(0, self.action.BUTTON_MAP.keys())
         values = list(self.action.BUTTON_MAP.keys())
@@ -49,12 +55,12 @@ class MouseControlsEditor(MouseControlsEditorBase):
         self.button_input.currentIndexChanged.connect(self.on_button_changed)
         self.show()
 
-    def on_button_changed(self):
+    def on_button_changed(self) -> None:
         """Disable modifier inputs when no button configured; enable
         otherwise.
         """
         self.ignore_on_changed = True
-        if self.get_button() == 'Not Configured':
+        if self.get_button() == "Not Configured":
             for key, checkbox in self.checkboxes.items():
                 checkbox.setChecked(False)
                 self.set_modifiers_enabled(False)
@@ -65,106 +71,133 @@ class MouseControlsEditor(MouseControlsEditorBase):
 
         self.ignore_on_changed = False
 
-    def set_modifiers_enabled(self, enabled):
+    def set_modifiers_enabled(self, enabled: bool) -> None:
         for key, checkbox in self.checkboxes.items():
             checkbox.setEnabled(enabled)
 
-    def get_button(self):
+    def get_button(self) -> str:
         values = list(self.action.BUTTON_MAP.keys())
         return values[self.button_input.currentIndex()]
 
-    def set_button(self, value):
+    def set_button(self, value: str) -> None:
         values = list(self.action.BUTTON_MAP.keys())
         self.button_input.setCurrentIndex(values.index(value))
 
-    def get_modifiers(self, cleaned=True):
-        if cleaned and self.get_button() == 'Not Configured':
+    def get_modifiers(self, cleaned: bool = True) -> list[str]:
+        if cleaned and self.get_button() == "Not Configured":
             # In this case the list should already be empty but just
             # to make sure...
             return []
         return super().get_modifiers(cleaned=True)
 
-    def get_temp_action(self):
-        return MouseConfig(button=self.get_button(),
-                           modifiers=self.get_modifiers(),
-                           group=None, text=None, invertible=None, id=None)
+    def get_temp_action(self) -> MouseConfig:
+        return MouseConfig(
+            button=self.get_button(),
+            modifiers=self.get_modifiers(),
+            group=None,
+            text=None,
+            invertible=None,
+            id=None,
+        )
 
-    def reset_inputs(self):
+    def reset_inputs(self) -> None:
         self.set_button(self.old_button)
         self.set_modifiers(self.old_modifiers)
 
 
 class MouseDelegate(QtWidgets.QStyledItemDelegate):
-
-    def createEditor(self, parent, option, index):
+    def createEditor(
+        self,
+        parent: QtWidgets.QWidget | None,
+        option: QtWidgets.QStyleOptionViewItem,
+        index: QtCore.QModelIndex,
+    ) -> QtWidgets.QWidget | None:
+        assert parent is not None
         widget = QtWidgets.QWidget(parent)
-        widget.editor = MouseControlsEditor(widget, index)
-        widget.editor.saved.connect(
-            partial(self.setModelData, widget, index.model(), index))
+        w = cast(Any, widget)
+        w.editor = MouseControlsEditor(widget, index)
+        w.editor.saved.connect(partial(self.setModelData, widget, index.model(), index))
         return widget
 
-    def setModelData(self, editor, model, index):
-        editor = editor.editor
-        if editor.result() == QtWidgets.QDialog.DialogCode.Accepted:
-            model.setData(
+    def setModelData(
+        self,
+        editor: QtWidgets.QWidget | None,
+        model: QtCore.QAbstractItemModel | None,
+        index: QtCore.QModelIndex,
+    ) -> None:
+        assert editor is not None
+        assert model is not None
+        inner_editor: MouseControlsEditor = cast(Any, editor).editor
+        if inner_editor.result() == QtWidgets.QDialog.DialogCode.Accepted:
+            cast(Any, model).setData(
                 index,
-                {'button': editor.get_button(),
-                 'modifiers': editor.get_modifiers()},
+                {
+                    "button": inner_editor.get_button(),
+                    "modifiers": inner_editor.get_modifiers(),
+                },
                 QtCore.Qt.ItemDataRole.EditRole,
-                remove_from_other=editor.remove_from_other)
+                remove_from_other=inner_editor.remove_from_other,
+            )
 
 
 class MouseModel(MouseControlsModelBase):
     """An entry in the keyboard shortcuts table."""
 
-    COLUMNS = (MouseControlsModelBase.COL_ACTION,
-               MouseControlsModelBase.COL_CHANGED,
-               MouseControlsModelBase.COL_BUTTON,
-               MouseControlsModelBase.COL_MODIFIERS,
-               MouseControlsModelBase.COL_INVERTED)
+    COLUMNS = (
+        MouseControlsModelBase.COL_ACTION,
+        MouseControlsModelBase.COL_CHANGED,
+        MouseControlsModelBase.COL_BUTTON,
+        MouseControlsModelBase.COL_MODIFIERS,
+        MouseControlsModelBase.COL_INVERTED,
+    )
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__(KeyboardSettings.MOUSE_ACTIONS)
 
-    def set_data_on_action(self, action, value):
-        action.set_button(value['button'])
-        action.set_modifiers(value['modifiers'])
+    def set_data_on_action(self, action: Any, value: Any) -> None:
+        action.set_button(value["button"])
+        action.set_modifiers(value["modifiers"])
 
 
 class MouseProxy(QtCore.QSortFilterProxyModel):
-
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.setSourceModel(MouseModel())
-        self.setFilterCaseSensitivity(
-            QtCore.Qt.CaseSensitivity.CaseInsensitive)
+        self.setFilterCaseSensitivity(QtCore.Qt.CaseSensitivity.CaseInsensitive)
 
-    def setData(self, index, value, role, remove_from_other=None):
-        result = self.sourceModel().setData(
-            self.mapToSource(index),
-            value,
-            role,
-            remove_from_other=remove_from_other)
+    def setData(
+        self,
+        index: QtCore.QModelIndex,
+        value: Any,
+        role: int = Qt.ItemDataRole.EditRole,
+        remove_from_other: Any = None,
+    ) -> bool:
+        source_model = self.sourceModel()
+        assert source_model is not None
+        result: bool = cast(Any, source_model).setData(
+            self.mapToSource(index), value, role, remove_from_other=remove_from_other
+        )
         return result
 
 
 class MouseView(QtWidgets.QTableView):
-
-    def __init__(self, parent):
+    def __init__(self, parent: QtWidgets.QWidget) -> None:
         super().__init__(parent)
         self.setMinimumSize(QtCore.QSize(400, 200))
         self.setItemDelegate(MouseDelegate())
         self.setShowGrid(False)
         self.setModel(MouseProxy())
-        self.horizontalHeader().setSectionResizeMode(
-            0, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self.horizontalHeader().setSectionResizeMode(
-            1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents)
-        self.setSelectionMode(
-            QtWidgets.QHeaderView.SelectionMode.SingleSelection)
+        header = self.horizontalHeader()
+        assert header is not None
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(
+            1, QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        self.setSelectionMode(QtWidgets.QHeaderView.SelectionMode.SingleSelection)
         self.setAlternatingRowColors(True)
-        settings_events.restore_defaults.connect(
-            self.on_restore_defaults)
+        settings_events.restore_defaults.connect(self.on_restore_defaults)
 
-    def on_restore_defaults(self):
-        self.viewport().update()
+    def on_restore_defaults(self) -> None:
+        viewport = self.viewport()
+        assert viewport is not None
+        viewport.update()

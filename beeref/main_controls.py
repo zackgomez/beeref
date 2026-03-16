@@ -13,15 +13,25 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from PyQt6 import QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
 from beeref import commands, widgets
 from beeref.items import BeePixmapItem
 from beeref import fileio
+
+if TYPE_CHECKING:
+    from beeref.view import BeeGraphicsView
+
+    _MainControlsBase = QtWidgets.QGraphicsView
+else:
+    _MainControlsBase = object
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +43,7 @@ class _RightClickState:
     can_movewin: bool
 
 
-class MainControlsMixin:
+class MainControlsMixin(_MainControlsBase):
     """Basic controls shared by the main view and the welcome overlay:
 
     * Right-click menu
@@ -41,7 +51,13 @@ class MainControlsMixin:
     * Moving the window without title bar
     """
 
-    def init_main_controls(self, main_window):
+    control_target: BeeGraphicsView
+    main_window: QtWidgets.QMainWindow
+    event_start: QtCore.QPointF
+    movewin_active: bool
+    right_click_state: _RightClickState | None
+
+    def init_main_controls(self, main_window: QtWidgets.QMainWindow) -> None:
         self.main_window = main_window
         # We manage right-click behavior ourselves so we can distinguish
         # a plain click (open context menu) from a drag (move window).
@@ -50,7 +66,7 @@ class MainControlsMixin:
         self.movewin_active = False
         self.right_click_state = None
 
-    def on_action_movewin_mode(self):
+    def on_action_movewin_mode(self) -> None:
         if self.movewin_active:
             # Pressing the same shortcut again should end the action
             self.exit_movewin_mode()
@@ -58,90 +74,99 @@ class MainControlsMixin:
             self.enter_movewin_mode()
 
     @property
-    def viewport_or_self(self):
-        if hasattr(self, 'viewport'):
-            return self.viewport()
+    def viewport_or_self(self) -> QtWidgets.QWidget:
+        viewport_fn = getattr(self, "viewport", None)
+        if viewport_fn is not None:
+            return viewport_fn()
         return self
 
-    def enter_movewin_mode(self):
-        logger.debug('Entering movewin mode')
+    def enter_movewin_mode(self) -> None:
+        logger.debug("Entering movewin mode")
         self.setMouseTracking(True)
         self.movewin_active = True
         self.viewport_or_self.setCursor(Qt.CursorShape.SizeAllCursor)
         self.event_start = QtCore.QPointF(self.cursor().pos())
-        if hasattr(self, 'disable_mouse_events'):
-            self.disable_mouse_events()
+        disable = getattr(self, "disable_mouse_events", None)
+        if disable is not None:
+            disable()
 
-    def exit_movewin_mode(self):
-        logger.debug('Exiting movewin mode')
+    def exit_movewin_mode(self) -> None:
+        logger.debug("Exiting movewin mode")
         self.setMouseTracking(False)
         self.movewin_active = False
         self.viewport_or_self.unsetCursor()
-        if hasattr(self, 'enable_mouse_events'):
-            self.enable_mouse_events()
+        enable = getattr(self, "enable_mouse_events", None)
+        if enable is not None:
+            enable()
 
-    def dragEnterEvent(self, event):
+    def dragEnterEvent(self, event: QtGui.QDragEnterEvent | None) -> None:
+        assert event is not None
         mimedata = event.mimeData()
-        logger.debug(f'Drag enter event: {mimedata.formats()}')
+        assert mimedata is not None
+        logger.debug(f"Drag enter event: {mimedata.formats()}")
         if mimedata.hasUrls():
             event.acceptProposedAction()
         elif mimedata.hasImage():
             event.acceptProposedAction()
         else:
-            msg = 'Attempted drop not an image or image too big'
+            msg = "Attempted drop not an image or image too big"
             logger.info(msg)
             widgets.BeeNotification(self.control_target, msg)
 
-    def dragMoveEvent(self, event):
+    def dragMoveEvent(self, event: QtGui.QDragMoveEvent | None) -> None:
+        assert event is not None
         event.acceptProposedAction()
 
-    def dropEvent(self, event):
+    def dropEvent(self, event: QtGui.QDropEvent | None) -> None:
+        assert event is not None
         mimedata = event.mimeData()
-        logger.debug(f'Handling file drop: {mimedata.formats()}')
-        pos = QtCore.QPoint(round(event.position().x()),
-                            round(event.position().y()))
+        assert mimedata is not None
+        logger.debug(f"Handling file drop: {mimedata.formats()}")
+        pos = QtCore.QPoint(round(event.position().x()), round(event.position().y()))
         if mimedata.hasUrls():
-            logger.debug(f'Found dropped urls: {mimedata.urls()}')
-            if not self.control_target.scene.items():
+            logger.debug(f"Found dropped urls: {mimedata.urls()}")
+            target = self.control_target
+            if not target.scene.items():
                 # Check if we have a bee file we can open directly
                 path = mimedata.urls()[0]
-                if (path.isLocalFile()
-                        and fileio.is_bee_file(path.toLocalFile())):
-                    self.control_target.open_from_file(path.toLocalFile())
+                if path.isLocalFile() and fileio.is_bee_file(path.toLocalFile()):
+                    target.open_from_file(path.toLocalFile())
                     return
-            self.control_target.do_insert_images(mimedata.urls(), pos)
+            target.do_insert_images(mimedata.urls(), pos)
         elif mimedata.hasImage():
             img = QtGui.QImage(mimedata.imageData())
             item = BeePixmapItem(img)
             pos = self.control_target.mapToScene(pos)
             self.control_target.undo_stack.push(
-                commands.InsertItems(self.control_target.scene, [item], pos))
+                commands.InsertItems(self.control_target.scene, [item], pos)
+            )
         else:
-            logger.info('Drop not an image')
+            logger.info("Drop not an image")
 
-    def mousePressEventMainControls(self, event):
+    def mousePressEventMainControls(self, event: QtGui.QMouseEvent) -> bool | None:
         if self.movewin_active:
             self.exit_movewin_mode()
             event.accept()
             return True
 
-        action, inverted = \
-            self.control_target.keyboard_settings.mouse_action_for_event(event)
+        action, inverted = self.control_target.keyboard_settings.mouse_action_for_event(
+            event
+        )
 
         if event.button() == Qt.MouseButton.RightButton:
             self.right_click_state = _RightClickState(
                 start_pos=event.position(),
-                can_movewin=(action == 'movewindow'),
+                can_movewin=(action == "movewindow"),
             )
             event.accept()
             return True
 
-        if action == 'movewindow':
+        if action == "movewindow":
             self.enter_movewin_mode()
             event.accept()
             return True
 
-    def mouseMoveEventMainControls(self, event):
+    def mouseMoveEventMainControls(self, event: QtGui.QMouseEvent) -> bool | None:
         if self.movewin_active:
             # Use globalPosition() directly from the event rather than
             # mapToGlobal(event.position()).  After main_window.move() the
@@ -152,8 +177,10 @@ class MainControlsMixin:
             pos = event.globalPosition()
             delta = pos - self.event_start
             self.event_start = pos
-            self.main_window.move(self.main_window.x() + round(delta.x()),
-                                  self.main_window.y() + round(delta.y()))
+            self.main_window.move(
+                self.main_window.x() + round(delta.x()),
+                self.main_window.y() + round(delta.y()),
+            )
             event.accept()
             return True
 
@@ -165,7 +192,7 @@ class MainControlsMixin:
                 event.accept()
                 return True
 
-    def mouseReleaseEventMainControls(self, event):
+    def mouseReleaseEventMainControls(self, event: QtGui.QMouseEvent) -> bool | None:
         if self.movewin_active:
             self.exit_movewin_mode()
             event.accept()
@@ -174,8 +201,7 @@ class MainControlsMixin:
         if event.button() == Qt.MouseButton.RightButton:
             if self.right_click_state:
                 delta = event.position() - self.right_click_state.start_pos
-                if (self.right_click_state.can_movewin
-                        and delta.manhattanLength() >= 2):
+                if self.right_click_state.can_movewin and delta.manhattanLength() >= 2:
                     self.right_click_state = None
                     event.accept()
                     return True
@@ -192,7 +218,7 @@ class MainControlsMixin:
             event.accept()
             return True
 
-    def keyPressEventMainControls(self, event):
+    def keyPressEventMainControls(self, event: QtGui.QKeyEvent) -> bool | None:
         if self.movewin_active:
             self.exit_movewin_mode()
             event.accept()

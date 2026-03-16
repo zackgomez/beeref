@@ -13,23 +13,39 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from collections import defaultdict
 from functools import partial
 import os.path
+from typing import TYPE_CHECKING, Any
 
 from PyQt6 import QtGui, QtWidgets
 
 from .actions import Action, actions
 from .menu_structure import menu_structure, MENU_SEPARATOR
 
+if TYPE_CHECKING:
+    from beeref.config import BeeSettings
 
-class ActionsMixin:
+    _ActionsMixinBase = QtWidgets.QWidget
+else:
+    _ActionsMixinBase = object
 
-    def actiongroup_set_enabled(self, group, value):
+
+class ActionsMixin(_ActionsMixinBase):
+    settings: BeeSettings
+    on_action_open_recent_file: Any
+    bee_actiongroups: defaultdict[str, list[QtGui.QAction]]
+    context_menu: QtWidgets.QMenu
+    _post_create_functions: list[tuple[Any, Any]]
+    _recent_files_submenu: QtWidgets.QMenu
+
+    def actiongroup_set_enabled(self, group: str, value: bool) -> None:
         for action in self.bee_actiongroups[group]:
             action.setEnabled(value)
 
-    def build_menu_and_actions(self):
+    def build_menu_and_actions(self) -> None:
         """Creates a new menu or rebuilds the given menu."""
         self.context_menu = QtWidgets.QMenu(self)
         self.bee_actiongroups = defaultdict(list)
@@ -41,14 +57,15 @@ class ActionsMixin:
             func(arg)
         del self._post_create_functions
 
-    def update_menu_and_actions(self):
+    def update_menu_and_actions(self) -> None:
         self._build_recent_files()
 
-    def _store_checkable_setting(self, key, value):
+    def _store_checkable_setting(self, key: str, value: bool) -> None:
         self.settings.setValue(key, value)
 
-    def _init_action_checkable(self, actiondef, qaction):
+    def _init_action_checkable(self, actiondef: Action, qaction: QtGui.QAction) -> None:
         qaction.setCheckable(True)
+        assert actiondef.callback is not None
         callback = getattr(self, actiondef.callback)
         qaction.toggled.connect(callback)
         settings_key = actiondef.settings
@@ -59,9 +76,10 @@ class ActionsMixin:
             qaction.setChecked(val)
             self._post_create_functions.append((callback, val))
             qaction.toggled.connect(
-                partial(self._store_checkable_setting, settings_key))
+                partial(self._store_checkable_setting, settings_key)
+            )
 
-    def _create_actions(self):
+    def _create_actions(self) -> None:
         for action in actions.values():
             qaction = QtGui.QAction(action.text, self)
             qaction.setAutoRepeat(False)
@@ -79,7 +97,7 @@ class ActionsMixin:
                 qaction.setEnabled(False)
             action.qaction = qaction
 
-    def _create_menu(self, menu, items):
+    def _create_menu(self, menu: QtWidgets.QMenu, items: Any) -> QtWidgets.QMenu:
         if isinstance(items, str):
             getattr(self, items)(menu)
             return menu
@@ -89,26 +107,28 @@ class ActionsMixin:
             if item == MENU_SEPARATOR:
                 menu.addSeparator()
             if isinstance(item, dict):
-                submenu = menu.addMenu(item['menu'])
-                self._create_menu(submenu, item['items'])
+                submenu = menu.addMenu(item["menu"])
+                self._create_menu(submenu, item["items"])
 
         return menu
 
-    def _build_recent_files(self, menu=None):
+    def _build_recent_files(self, menu: QtWidgets.QMenu | None = None) -> None:
         if menu:
             self._recent_files_submenu = menu
         self._clear_recent_files()
 
         files = self.settings.get_recent_files(existing_only=True)
-        items = []
+        items: list[str] = []
 
         for i in range(10):
-            action_id = f'recent_files_{i}'
+            action_id = f"recent_files_{i}"
             key = 0 if i == 9 else i + 1
-            action = Action(id=action_id,
-                            menu_id='_build_recent_files',
-                            text=f'File {i + 1}',
-                            shortcuts=[f'Ctrl+{key}'])
+            action = Action(
+                id=action_id,
+                menu_id="_build_recent_files",
+                text=f"File {i + 1}",
+                shortcuts=[f"Ctrl+{key}"],
+            )
             actions[action_id] = action
 
             if i < len(files):
@@ -116,16 +136,17 @@ class ActionsMixin:
                 qaction = QtGui.QAction(os.path.basename(filename), self)
                 qaction.setShortcuts(action.get_shortcuts())
                 qaction.triggered.connect(
-                    partial(self.on_action_open_recent_file, filename))
+                    partial(self.on_action_open_recent_file, filename)
+                )
                 self.addAction(qaction)
                 action.qaction = qaction
                 self._recent_files_submenu.addAction(qaction)
                 items.append(action_id)
 
-    def _clear_recent_files(self):
+    def _clear_recent_files(self) -> None:
         for action in self._recent_files_submenu.actions():
             self.removeAction(action)
         self._recent_files_submenu.clear()
         for key in list(actions.keys()):
-            if key.startswith('recent_files_'):
+            if key.startswith("recent_files_"):
                 actions[key].qaction = None

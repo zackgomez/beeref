@@ -13,8 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 import logging
 import math
+from typing import Any, Optional, cast
 
 from PyQt6 import QtWidgets, QtGui, QtCore
 from PyQt6.QtCore import Qt
@@ -29,16 +32,17 @@ class GamutPainterThread(QtCore.QThread):
     finished = QtCore.pyqtSignal(QtGui.QImage)
     radius = 250
 
-    def __init__(self, parent, item):
+    def __init__(self, parent: GamutWidget, item: Any) -> None:
         super().__init__()
         self.item = item
-        self.parent = parent
+        self._gamut_parent = parent
 
-    def run(self):
-        logger.debug('Start drawing gamut image...')
+    def run(self) -> None:
+        logger.debug("Start drawing gamut image...")
         self.image = QtGui.QImage(
             QtCore.QSize(2 * self.radius, 2 * self.radius),
-            QtGui.QImage.Format.Format_ARGB32)
+            QtGui.QImage.Format.Format_ARGB32,
+        )
         self.image.fill(QtGui.QColor(0, 0, 0, 0))
 
         painter = QtGui.QPainter(self.image)
@@ -47,10 +51,10 @@ class GamutPainterThread(QtCore.QThread):
         painter.setPen(Qt.PenStyle.NoPen)
         center = QtCore.QPoint(self.radius, self.radius)
         painter.drawEllipse(center, self.radius, self.radius)
-        logger.debug(f'Threshold: {self.parent.threshold}')
+        logger.debug(f"Threshold: {self._gamut_parent.threshold}")
 
         for (hue, saturation), count in self.item.color_gamut.items():
-            if count < self.parent.threshold:
+            if count < self._gamut_parent.threshold:
                 continue
             hypotenuse = saturation / 255 * self.radius
             angle = math.radians(-90 - hue)
@@ -61,12 +65,11 @@ class GamutPainterThread(QtCore.QThread):
             painter.setBrush(QtGui.QBrush(color))
             painter.drawEllipse(QtCore.QPoint(x, y), 3, 3)
 
-        logger.debug('Finished drawing gamut image.')
+        logger.debug("Finished drawing gamut image.")
         self.finished.emit(self.image)
 
 
 class GamutWidget(QtWidgets.QWidget):
-
     def __init__(self, parent, item):
         super().__init__(parent)
         self.item = item
@@ -76,11 +79,12 @@ class GamutWidget(QtWidgets.QWidget):
         self.worker.start()
 
     @property
-    def threshold(self):
-        return self.parent().threshold_input.value()
+    def threshold(self) -> int:
+        parent = cast("GamutDialog", self.parent())
+        return parent.threshold_input.value()
 
     def on_gamut_finished(self, image):
-        logger.debug('Gamut image update received')
+        logger.debug("Gamut image update received")
         self.image = image
         self.update()
 
@@ -90,7 +94,7 @@ class GamutWidget(QtWidgets.QWidget):
     def update_values(self):
         self.worker.start()
 
-    def paintEvent(self, event):
+    def paintEvent(self, event: Optional[QtGui.QPaintEvent]) -> None:
         painter = QtGui.QPainter(self)
         painter.setRenderHint(painter.RenderHint.SmoothPixmapTransform)
         if self.image:
@@ -99,19 +103,19 @@ class GamutWidget(QtWidgets.QWidget):
             y = max((self.size().height() - size) / 2, 0)
             painter.drawImage(QtCore.QRectF(x, y, size, size), self.image)
         else:
-            painter.drawText(10, 20, 'Counting pixels...')
+            painter.drawText(10, 20, "Counting pixels...")
 
 
 class GamutDialog(QtWidgets.QDialog):
     def __init__(self, parent, item):
         super().__init__(parent)
         self.item = item
-        self.setWindowTitle('Color Gamut')
+        self.setWindowTitle("Color Gamut")
 
         # The input controls on the right
         controls_layout = QtWidgets.QVBoxLayout()
 
-        label = QtWidgets.QLabel('Threshold:', self)
+        label = QtWidgets.QLabel("Threshold:", self)
         controls_layout.addWidget(label)
         self.threshold_input = QtWidgets.QSlider(self)
         self.threshold_input.setRange(0, 500)
@@ -119,10 +123,12 @@ class GamutDialog(QtWidgets.QDialog):
         self.threshold_input.setTracking(False)
         self.threshold_input.valueChanged.connect(self.on_value_changed)
         controls_layout.addWidget(
-            self.threshold_input, alignment=Qt.AlignmentFlag.AlignHCenter)
+            self.threshold_input, alignment=Qt.AlignmentFlag.AlignHCenter
+        )
 
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Close)
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
         buttons.rejected.connect(self.reject)
 
         controls_layout.addWidget(buttons)

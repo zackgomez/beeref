@@ -13,10 +13,14 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from functools import partial
-import logging
 import os
 import os.path
+from typing import Any, Callable, cast
+
+from beeref.logging import getLogger
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
@@ -36,39 +40,42 @@ from beeref.utils import get_file_extension_from_format, qcolor_to_hex
 
 
 commandline_args = CommandlineArgs()
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
-class BeeGraphicsView(MainControlsMixin,
-                      QtWidgets.QGraphicsView,
-                      ActionsMixin):
+class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
+    scene: BeeGraphicsScene
+    parent: QtWidgets.QMainWindow
 
     PAN_MODE = 1
     ZOOM_MODE = 2
     SAMPLE_COLOR_MODE = 3
 
-    def __init__(self, app, parent=None):
+    def __init__(
+        self, app: QtWidgets.QApplication, parent: QtWidgets.QMainWindow | None = None
+    ) -> None:
         super().__init__(parent)
         self.app = app
+        assert parent is not None
         self.parent = parent
         self.settings = BeeSettings()
         self.keyboard_settings = KeyboardSettings()
         self.welcome_overlay = widgets.welcome_overlay.WelcomeOverlay(self)
 
-        canvas_color = self.settings.valueOrDefault('View/canvas_color')
-        self.setBackgroundBrush(
-            QtGui.QBrush(QtGui.QColor(canvas_color)))
-        def on_canvas_color_changed(color):
+        canvas_color = self.settings.valueOrDefault("View/canvas_color")
+        self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(canvas_color)))
+
+        def on_canvas_color_changed(color: str) -> None:
             self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(color)))
             self.welcome_overlay.update_background_color()
-        BeeSettings.FIELDS['View/canvas_color']['post_save_callback'] = (
-            on_canvas_color_changed)
+
+        BeeSettings.FIELDS["View/canvas_color"]["post_save_callback"] = (
+            on_canvas_color_changed
+        )
         self.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         self.undo_stack = QtGui.QUndoStack(self)
         self.undo_stack.setUndoLimit(100)
@@ -77,8 +84,8 @@ class BeeGraphicsView(MainControlsMixin,
         self.undo_stack.cleanChanged.connect(self.on_undo_clean_changed)
 
         self.filename = None
-        self.previous_transform = None
-        self.active_mode = None
+        self.previous_transform: dict[str, Any] | None = None
+        self.active_mode: int | None = None
 
         self.scene = BeeGraphicsScene(self.undo_stack)
         self.scene.changed.connect(self.on_scene_changed)
@@ -95,7 +102,7 @@ class BeeGraphicsView(MainControlsMixin,
         # Load files given via command line
         if commandline_args.filenames:
             fn = commandline_args.filenames[0]
-            if os.path.splitext(fn)[1] == '.bee':
+            if os.path.splitext(fn)[1] == ".bee":
                 self.open_from_file(fn)
             else:
                 self.do_insert_images(commandline_args.filenames)
@@ -103,271 +110,285 @@ class BeeGraphicsView(MainControlsMixin,
         self.update_window_title()
 
     @property
-    def filename(self):
+    def filename(self) -> str | None:
         return self._filename
 
     @filename.setter
-    def filename(self, value):
+    def filename(self, value: str | None) -> None:
         self._filename = value
         self.update_window_title()
         if value:
             self.settings.update_recent_files(value)
             self.update_menu_and_actions()
 
-    def cancel_active_modes(self):
+    def require_viewport(self) -> QtWidgets.QWidget:
+        vp = self.viewport()
+        assert vp is not None
+        return vp
+
+    def cancel_active_modes(self) -> None:
         self.scene.cancel_active_modes()
         self.cancel_sample_color_mode()
         self.active_mode = None
 
-    def cancel_sample_color_mode(self):
-        logger.debug('Cancel sample color mode')
+    def cancel_sample_color_mode(self) -> None:
+        logger.debug("Cancel sample color mode")
         self.active_mode = None
-        self.viewport().unsetCursor()
-        if hasattr(self, 'sample_color_widget'):
+        self.require_viewport().unsetCursor()
+        if hasattr(self, "sample_color_widget"):
             self.sample_color_widget.hide()
             del self.sample_color_widget
         if self.scene.has_multi_selection():
             self.scene.multi_select_item.bring_to_front()
 
-    def update_window_title(self):
+    def update_window_title(self) -> None:
         clean = self.undo_stack.isClean()
         if clean and not self.filename:
             title = constants.APPNAME
         else:
-            name = os.path.basename(self.filename or '[Untitled]')
-            clean = '' if clean else '*'
-            title = f'{name}{clean} - {constants.APPNAME}'
+            name = os.path.basename(self.filename or "[Untitled]")
+            clean = "" if clean else "*"
+            title = f"{name}{clean} - {constants.APPNAME}"
         self.parent.setWindowTitle(title)
 
-    def on_scene_changed(self, region):
+    def on_scene_changed(self, region: list[QtCore.QRectF]) -> None:
         if not self.scene.items():
-            logger.debug('No items in scene')
+            logger.debug("No items in scene")
             self.setTransform(QtGui.QTransform())
             self.welcome_overlay.setFocus()
             self.clearFocus()
             self.welcome_overlay.show()
-            self.actiongroup_set_enabled('active_when_items_in_scene', False)
+            self.actiongroup_set_enabled("active_when_items_in_scene", False)
         else:
             self.setFocus()
             self.welcome_overlay.clearFocus()
             self.welcome_overlay.hide()
-            self.actiongroup_set_enabled('active_when_items_in_scene', True)
+            self.actiongroup_set_enabled("active_when_items_in_scene", True)
         self.recalc_scene_rect()
 
-    def on_can_redo_changed(self, can_redo):
-        self.actiongroup_set_enabled('active_when_can_redo', can_redo)
+    def on_can_redo_changed(self, can_redo: bool) -> None:
+        self.actiongroup_set_enabled("active_when_can_redo", can_redo)
 
-    def on_can_undo_changed(self, can_undo):
-        self.actiongroup_set_enabled('active_when_can_undo', can_undo)
+    def on_can_undo_changed(self, can_undo: bool) -> None:
+        self.actiongroup_set_enabled("active_when_can_undo", can_undo)
 
-    def on_undo_clean_changed(self, clean):
+    def on_undo_clean_changed(self, clean: bool) -> None:
         self.update_window_title()
 
-    def on_context_menu(self, point):
-        self.context_menu.exec(self.mapToGlobal(point))
+    def on_context_menu(self, point: QtCore.QPoint) -> None:
+        global_point = self.mapToGlobal(point)
+        exec_menu = cast(Any, self.context_menu.exec)
+        exec_menu(global_point)
 
-    def get_supported_image_formats(self, cls):
-        formats = []
+    def get_supported_image_formats(self, cls: type[Any]) -> str:
+        formats: list[str] = []
 
         for f in cls.supportedImageFormats():
-            string = f'*.{f.data().decode()}'
+            string = f"*.{f.data().decode()}"
             formats.extend((string, string.upper()))
-        return ' '.join(formats)
+        return " ".join(formats)
 
-    def get_view_center(self):
-        return QtCore.QPoint(round(self.size().width() / 2),
-                             round(self.size().height() / 2))
+    def get_view_center(self) -> QtCore.QPoint:
+        return QtCore.QPoint(
+            round(self.size().width() / 2), round(self.size().height() / 2)
+        )
 
-    def clear_scene(self):
-        logging.debug('Clearing scene...')
+    def clear_scene(self) -> None:
+        logger.debug("Clearing scene...")
         self.cancel_active_modes()
         self.scene.clear()
         self.undo_stack.clear()
         self.filename = None
         self.setTransform(QtGui.QTransform())
 
-    def reset_previous_transform(self, toggle_item=None):
-        if (self.previous_transform
-                and self.previous_transform['toggle_item'] != toggle_item):
+    def reset_previous_transform(self, toggle_item: Any = None) -> None:
+        if (
+            self.previous_transform
+            and self.previous_transform["toggle_item"] != toggle_item
+        ):
             self.previous_transform = None
 
-    def fit_rect(self, rect, toggle_item=None):
+    def fit_rect(self, rect: QtCore.QRectF, toggle_item: Any = None) -> None:
         if toggle_item and self.previous_transform:
-            logger.debug('Fit view: Reset to previous')
-            self.setTransform(self.previous_transform['transform'])
-            self.centerOn(self.previous_transform['center'])
+            logger.debug("Fit view: Reset to previous")
+            self.setTransform(self.previous_transform["transform"])
+            self.centerOn(self.previous_transform["center"])
             self.previous_transform = None
             return
         if toggle_item:
             self.previous_transform = {
-                'toggle_item': toggle_item,
-                'transform': QtGui.QTransform(self.transform()),
-                'center': self.mapToScene(self.get_view_center()),
+                "toggle_item": toggle_item,
+                "transform": QtGui.QTransform(self.transform()),
+                "center": self.mapToScene(self.get_view_center()),
             }
         else:
             self.previous_transform = None
 
-        logger.debug(f'Fit view: {rect}')
+        logger.debug(f"Fit view: {rect}")
         self.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
         self.recalc_scene_rect()
         # It seems to be more reliable when we fit a second time
         # Sometimes a changing scene rect can mess up the fitting
         self.fitInView(rect, Qt.AspectRatioMode.KeepAspectRatio)
-        logger.trace('Fit view done')
+        logger.trace("Fit view done")
 
-    def get_confirmation_unsaved_changes(self, msg):
-        confirm = self.settings.valueOrDefault('Save/confirm_close_unsaved')
+    def get_confirmation_unsaved_changes(self, msg: str) -> bool:
+        confirm = self.settings.valueOrDefault("Save/confirm_close_unsaved")
         if confirm and not self.undo_stack.isClean():
             answer = QtWidgets.QMessageBox.question(
                 self,
-                'Discard unsaved changes?',
+                "Discard unsaved changes?",
                 msg,
-                QtWidgets.QMessageBox.StandardButton.Yes |
-                QtWidgets.QMessageBox.StandardButton.Cancel)
+                QtWidgets.QMessageBox.StandardButton.Yes
+                | QtWidgets.QMessageBox.StandardButton.Cancel,
+            )
             return answer == QtWidgets.QMessageBox.StandardButton.Yes
 
         return True
 
-    def on_action_new_scene(self):
+    def on_action_new_scene(self) -> None:
         confirm = self.get_confirmation_unsaved_changes(
-            'There are unsaved changes. '
-            'Are you sure you want to open a new scene?')
+            "There are unsaved changes. Are you sure you want to open a new scene?"
+        )
         if confirm:
             self.clear_scene()
 
-    def on_action_fit_scene(self):
+    def on_action_fit_scene(self) -> None:
         self.fit_rect(self.scene.itemsBoundingRect())
 
-    def on_action_fit_selection(self):
+    def on_action_fit_selection(self) -> None:
         self.fit_rect(self.scene.itemsBoundingRect(selection_only=True))
 
-    def on_action_fullscreen(self, checked):
+    def on_action_fullscreen(self, checked: bool) -> None:
         if checked:
             self.parent.showFullScreen()
         else:
             self.parent.showNormal()
 
-    def on_action_always_on_top(self, checked):
-        self.parent.setWindowFlag(
-            Qt.WindowType.WindowStaysOnTopHint, on=checked)
+    def on_action_always_on_top(self, checked: bool) -> None:
+        self.parent.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, on=checked)
         self.parent.destroy()
         self.parent.create()
         self.parent.show()
 
-    def on_action_show_titlebar(self, checked):
-        self.parent.setWindowFlag(
-            Qt.WindowType.FramelessWindowHint, on=not checked)
+    def on_action_show_titlebar(self, checked: bool) -> None:
+        self.parent.setWindowFlag(Qt.WindowType.FramelessWindowHint, on=not checked)
         self.parent.destroy()
         self.parent.create()
         self.parent.show()
 
-    def on_action_move_window(self):
+    def on_action_move_window(self) -> None:
         self.on_action_movewin_mode()
 
-    def on_action_undo(self):
-        logger.debug('Undo: %s' % self.undo_stack.undoText())
+    def on_action_undo(self) -> None:
+        logger.debug("Undo: %s" % self.undo_stack.undoText())
         self.cancel_active_modes()
         self.undo_stack.undo()
 
-    def on_action_redo(self):
-        logger.debug('Redo: %s' % self.undo_stack.redoText())
+    def on_action_redo(self) -> None:
+        logger.debug("Redo: %s" % self.undo_stack.redoText())
         self.cancel_active_modes()
         self.undo_stack.redo()
 
-    def on_action_select_all(self):
+    def on_action_select_all(self) -> None:
         self.scene.select_all_items()
 
-    def on_action_deselect_all(self):
+    def on_action_deselect_all(self) -> None:
         self.scene.deselect_all_items()
 
-    def on_action_delete_items(self):
-        logger.debug('Deleting items...')
+    def on_action_delete_items(self) -> None:
+        logger.debug("Deleting items...")
         self.cancel_active_modes()
         self.undo_stack.push(
-            commands.DeleteItems(
-                self.scene, self.scene.selectedItems(user_only=True)))
+            commands.DeleteItems(self.scene, self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_cut(self):
-        logger.debug('Cutting items...')
+    def on_action_cut(self) -> None:
+        logger.debug("Cutting items...")
         self.on_action_copy()
         self.undo_stack.push(
-            commands.DeleteItems(
-                self.scene, self.scene.selectedItems(user_only=True)))
+            commands.DeleteItems(self.scene, self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_raise_to_top(self):
+    def on_action_raise_to_top(self) -> None:
         self.scene.raise_to_top()
 
-    def on_action_lower_to_bottom(self):
+    def on_action_lower_to_bottom(self) -> None:
         self.scene.lower_to_bottom()
 
-    def on_action_normalize_height(self):
+    def on_action_normalize_height(self) -> None:
         self.scene.normalize_height()
 
-    def on_action_normalize_width(self):
+    def on_action_normalize_width(self) -> None:
         self.scene.normalize_width()
 
-    def on_action_normalize_size(self):
+    def on_action_normalize_size(self) -> None:
         self.scene.normalize_size()
 
-    def on_action_arrange_horizontal(self):
+    def on_action_arrange_horizontal(self) -> None:
         self.scene.arrange()
 
-    def on_action_arrange_vertical(self):
+    def on_action_arrange_vertical(self) -> None:
         self.scene.arrange(vertical=True)
 
-    def on_action_arrange_optimal(self):
+    def on_action_arrange_optimal(self) -> None:
         self.scene.arrange_optimal()
 
-    def on_action_arrange_square(self):
+    def on_action_arrange_square(self) -> None:
         self.scene.arrange_square()
 
-    def on_action_change_opacity(self):
-        images = list(filter(
-            lambda item: item.is_image,
-            self.scene.selectedItems(user_only=True)))
+    def on_action_change_opacity(self) -> None:
+        images = list(
+            filter(lambda item: item.is_image, self.scene.selectedItems(user_only=True))
+        )
         widgets.ChangeOpacityDialog(self, images, self.undo_stack)
 
-    def on_action_crop(self):
+    def on_action_crop(self) -> None:
         self.scene.crop_items()
 
-    def on_action_flip_horizontally(self):
+    def on_action_flip_horizontally(self) -> None:
         self.scene.flip_items(vertical=False)
 
-    def on_action_flip_vertically(self):
+    def on_action_flip_vertically(self) -> None:
         self.scene.flip_items(vertical=True)
 
-    def on_action_reset_scale(self):
+    def on_action_reset_scale(self) -> None:
         self.cancel_active_modes()
-        self.undo_stack.push(commands.ResetScale(
-            self.scene.selectedItems(user_only=True)))
+        self.undo_stack.push(
+            commands.ResetScale(self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_reset_rotation(self):
+    def on_action_reset_rotation(self) -> None:
         self.cancel_active_modes()
-        self.undo_stack.push(commands.ResetRotation(
-            self.scene.selectedItems(user_only=True)))
+        self.undo_stack.push(
+            commands.ResetRotation(self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_reset_flip(self):
+    def on_action_reset_flip(self) -> None:
         self.cancel_active_modes()
-        self.undo_stack.push(commands.ResetFlip(
-            self.scene.selectedItems(user_only=True)))
+        self.undo_stack.push(
+            commands.ResetFlip(self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_reset_crop(self):
+    def on_action_reset_crop(self) -> None:
         self.cancel_active_modes()
-        self.undo_stack.push(commands.ResetCrop(
-            self.scene.selectedItems(user_only=True)))
+        self.undo_stack.push(
+            commands.ResetCrop(self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_reset_transforms(self):
+    def on_action_reset_transforms(self) -> None:
         self.cancel_active_modes()
-        self.undo_stack.push(commands.ResetTransforms(
-            self.scene.selectedItems(user_only=True)))
+        self.undo_stack.push(
+            commands.ResetTransforms(self.scene.selectedItems(user_only=True))
+        )
 
-    def on_action_show_color_gamut(self):
+    def on_action_show_color_gamut(self) -> None:
         widgets.color_gamut.GamutDialog(self, self.scene.selectedItems()[0])
 
-    def on_action_sample_color(self):
+    def on_action_sample_color(self) -> None:
         self.cancel_active_modes()
-        logger.debug('Entering sample color mode')
-        self.viewport().setCursor(Qt.CursorShape.CrossCursor)
+        logger.debug("Entering sample color mode")
+        self.require_viewport().setCursor(Qt.CursorShape.CrossCursor)
         self.active_mode = self.SAMPLE_COLOR_MODE
 
         if self.scene.has_multi_selection():
@@ -377,114 +398,121 @@ class BeeGraphicsView(MainControlsMixin,
 
         pos = self.mapFromGlobal(self.cursor().pos())
         self.sample_color_widget = widgets.SampleColorWidget(
-            self,
-            pos,
-            self.scene.sample_color_at(self.mapToScene(pos)))
+            self, pos, self.scene.sample_color_at(self.mapToScene(pos))
+        )
 
-    def on_items_loaded(self, value):
-        logger.debug('On items loaded: add queued items')
+    def on_items_loaded(self, value: int) -> None:
+        logger.debug("On items loaded: add queued items")
         self.scene.add_queued_items()
 
-    def on_loading_finished(self, filename, errors):
+    def on_loading_finished(self, filename: str, errors: list[Any]) -> None:
         if errors:
             QtWidgets.QMessageBox.warning(
                 self,
-                'Problem loading file',
-                ('<p>Problem loading file %s</p>'
-                 '<p>Not accessible or not a proper bee file</p>') % filename)
+                "Problem loading file",
+                (
+                    "<p>Problem loading file %s</p>"
+                    "<p>Not accessible or not a proper bee file</p>"
+                )
+                % filename,
+            )
         else:
             self.filename = filename
             self.scene.add_queued_items()
             self.on_action_fit_scene()
 
-    def on_action_open_recent_file(self, filename):
+    def on_action_open_recent_file(self, filename: str) -> None:
         confirm = self.get_confirmation_unsaved_changes(
-            'There are unsaved changes. '
-            'Are you sure you want to open a new scene?')
+            "There are unsaved changes. Are you sure you want to open a new scene?"
+        )
         if confirm:
             self.open_from_file(filename)
 
-    def open_from_file(self, filename):
-        logger.info(f'Opening file {filename}')
+    def open_from_file(self, filename: str) -> None:
+        logger.info(f"Opening file {filename}")
         self.clear_scene()
-        self.worker = fileio.ThreadedIO(
-            fileio.load_bee, filename, self.scene)
+        self.worker = fileio.ThreadedIO(fileio.load_bee, filename, self.scene)
         self.worker.progress.connect(self.on_items_loaded)
         self.worker.finished.connect(self.on_loading_finished)
         self.progress = widgets.BeeProgressDialog(
-            f'Loading {filename}',
-            worker=self.worker,
-            parent=self)
+            f"Loading {filename}", worker=self.worker, parent=self
+        )
         self.worker.start()
 
-    def on_action_open(self):
+    def on_action_open(self) -> None:
         confirm = self.get_confirmation_unsaved_changes(
-            'There are unsaved changes. '
-            'Are you sure you want to open a new scene?')
+            "There are unsaved changes. Are you sure you want to open a new scene?"
+        )
         if not confirm:
             return
 
         self.cancel_active_modes()
         filename, f = QtWidgets.QFileDialog.getOpenFileName(
-            parent=self,
-            caption='Open file',
-            filter=f'{constants.APPNAME} File (*.bee)')
+            parent=self, caption="Open file", filter=f"{constants.APPNAME} File (*.bee)"
+        )
         if filename:
             filename = os.path.normpath(filename)
             self.open_from_file(filename)
             self.filename = filename
 
-    def on_saving_finished(self, filename, errors):
+    def on_saving_finished(self, filename: str, errors: list[Any]) -> None:
         if errors:
             QtWidgets.QMessageBox.warning(
                 self,
-                'Problem saving file',
-                ('<p>Problem saving file %s</p>'
-                 '<p>File/directory not accessible</p>') % filename)
+                "Problem saving file",
+                ("<p>Problem saving file %s</p><p>File/directory not accessible</p>")
+                % filename,
+            )
         else:
             self.filename = filename
             self.undo_stack.setClean()
 
-    def do_save(self, filename, create_new):
+    def do_save(self, filename: str, create_new: bool) -> None:
         if not fileio.is_bee_file(filename):
-            filename = f'{filename}.bee'
+            filename = f"{filename}.bee"
         self.worker = fileio.ThreadedIO(
-            fileio.save_bee, filename, self.scene, create_new=create_new)
+            fileio.save_bee, filename, self.scene, create_new=create_new
+        )
         self.worker.finished.connect(self.on_saving_finished)
         self.progress = widgets.BeeProgressDialog(
-            f'Saving {filename}',
-            worker=self.worker,
-            parent=self)
+            f"Saving {filename}", worker=self.worker, parent=self
+        )
         self.worker.start()
 
-    def on_action_save_as(self):
+    def on_action_save_as(self) -> None:
         self.cancel_active_modes()
         directory = os.path.dirname(self.filename) if self.filename else None
         filename, f = QtWidgets.QFileDialog.getSaveFileName(
             parent=self,
-            caption='Save file',
+            caption="Save file",
             directory=directory,
-            filter=f'{constants.APPNAME} File (*.bee)')
+            filter=f"{constants.APPNAME} File (*.bee)",
+        )
         if filename:
             self.do_save(filename, create_new=True)
 
-    def on_action_save(self):
+    def on_action_save(self) -> None:
         self.cancel_active_modes()
         if not self.filename:
             self.on_action_save_as()
         else:
             self.do_save(self.filename, create_new=False)
 
-    def on_action_export_scene(self):
+    def on_action_export_scene(self) -> None:
         directory = os.path.dirname(self.filename) if self.filename else None
         filename, formatstr = QtWidgets.QFileDialog.getSaveFileName(
             parent=self,
-            caption='Export Scene to Image',
+            caption="Export Scene to Image",
             directory=directory,
-            filter=';;'.join(('Image Files (*.png *.jpg *.jpeg *.svg)',
-                              'PNG (*.png)',
-                              'JPEG (*.jpg *.jpeg)',
-                              'SVG (*.svg)')))
+            filter=";;".join(
+                (
+                    "Image Files (*.png *.jpg *.jpeg *.svg)",
+                    "PNG (*.png)",
+                    "JPEG (*.jpg *.jpeg)",
+                    "SVG (*.svg)",
+                )
+            ),
+        )
 
         if not filename:
             return
@@ -492,8 +520,8 @@ class BeeGraphicsView(MainControlsMixin,
         name, ext = os.path.splitext(filename)
         if not ext:
             ext = get_file_extension_from_format(formatstr)
-            filename = f'{filename}.{ext}'
-        logger.debug(f'Got export filename {filename}')
+            filename = f"{filename}.{ext}"
+        logger.debug(f"Got export filename {filename}")
 
         exporter_cls = exporter_registry[ext]
         exporter = exporter_cls(self.scene)
@@ -503,79 +531,81 @@ class BeeGraphicsView(MainControlsMixin,
         self.worker = fileio.ThreadedIO(exporter.export, filename)
         self.worker.finished.connect(self.on_export_finished)
         self.progress = widgets.BeeProgressDialog(
-            f'Exporting {filename}',
-            worker=self.worker,
-            parent=self)
+            f"Exporting {filename}", worker=self.worker, parent=self
+        )
         self.worker.start()
 
-    def on_export_finished(self, filename, errors):
+    def on_export_finished(self, filename: str, errors: list[Any]) -> None:
         if errors:
-            err_msg = '</br>'.join(str(errors))
+            err_msg = "</br>".join(str(errors))
             QtWidgets.QMessageBox.warning(
                 self,
-                'Problem writing file',
-                f'<p>Problem writing file {filename}</p><p>{err_msg}</p>')
+                "Problem writing file",
+                f"<p>Problem writing file {filename}</p><p>{err_msg}</p>",
+            )
 
-    def on_action_export_images(self):
+    def on_action_export_images(self) -> None:
         directory = os.path.dirname(self.filename) if self.filename else None
         directory = QtWidgets.QFileDialog.getExistingDirectory(
-            parent=self,
-            caption='Export Images',
-            directory=directory)
+            parent=self, caption="Export Images", directory=directory
+        )
 
         if not directory:
             return
 
-        logger.debug(f'Got export directory {directory}')
+        logger.debug(f"Got export directory {directory}")
         self.exporter = ImagesToDirectoryExporter(self.scene, directory)
         self.worker = fileio.ThreadedIO(self.exporter.export)
-        self.worker.user_input_required.connect(
-            self.on_export_images_file_exists)
+        self.worker.user_input_required.connect(self.on_export_images_file_exists)
         self.worker.finished.connect(self.on_export_finished)
         self.progress = widgets.BeeProgressDialog(
-            f'Exporting to {directory}',
-            worker=self.worker,
-            parent=self)
+            f"Exporting to {directory}", worker=self.worker, parent=self
+        )
         self.worker.start()
 
-    def on_export_images_file_exists(self, filename):
+    def on_export_images_file_exists(self, filename: str) -> None:
         dlg = widgets.ExportImagesFileExistsDialog(self, filename)
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.exporter.handle_existing = dlg.get_answer()
             directory = self.exporter.dirname
             self.progress = widgets.BeeProgressDialog(
-                f'Exporting to {directory}',
-                worker=self.worker,
-                parent=self)
+                f"Exporting to {directory}", worker=self.worker, parent=self
+            )
             self.worker.start()
 
-    def on_action_quit(self):
+    def on_action_quit(self) -> None:
         confirm = self.get_confirmation_unsaved_changes(
-            'There are unsaved changes. Are you sure you want to quit?')
+            "There are unsaved changes. Are you sure you want to quit?"
+        )
         if confirm:
-            logger.info('User quit. Exiting...')
+            logger.info("User quit. Exiting...")
             self.app.quit()
 
-    def on_action_settings(self):
+    def on_action_settings(self) -> None:
         widgets.settings.SettingsDialog(self)
 
-    def on_action_help(self):
+    def on_action_help(self) -> None:
         widgets.HelpDialog(self)
 
-    def on_action_about(self):
+    def on_action_about(self) -> None:
         QtWidgets.QMessageBox.about(
             self,
-            f'About {constants.APPNAME}',
-            (f'<h2>{constants.APPNAME} {constants.VERSION}</h2>'
-             f'<p>{constants.APPNAME_FULL}</p>'
-             f'<p>{constants.COPYRIGHT}</p>'
-             f'<p><a href="{constants.WEBSITE}">'
-             f'Visit the {constants.APPNAME} website</a></p>'))
+            f"About {constants.APPNAME}",
+            (
+                f"<h2>{constants.APPNAME} {constants.VERSION}</h2>"
+                f"<p>{constants.APPNAME_FULL}</p>"
+                f"<p>{constants.COPYRIGHT}</p>"
+                f'<p><a href="{constants.WEBSITE}">'
+                f"Visit the {constants.APPNAME} website</a></p>"
+            ),
+        )
 
-    def on_action_debuglog(self):
+    def on_action_debuglog(self) -> None:
         widgets.DebugLogDialog(self)
 
-    def on_insert_images_finished(self, new_scene, filename, errors):
+    def on_insert_images_finished(
+        self, new_scene: bool, filename: str, errors: list[str]
+    ) -> None:
         """Callback for when loading of images is finished.
 
         :param new_scene: True if the scene was empty before, else False
@@ -583,54 +613,52 @@ class BeeGraphicsView(MainControlsMixin,
         :param errors: List of filenames that couldn't be loaded
         """
 
-        logger.debug('Insert images finished')
+        logger.debug("Insert images finished")
         if errors:
-            errornames = [
-                f'<li>{fn}</li>' for fn in errors]
-            errornames = '<ul>%s</ul>' % '\n'.join(errornames)
+            errornames = [f"<li>{fn}</li>" for fn in errors]
+            errornames = "<ul>%s</ul>" % "\n".join(errornames)
             num = len(errors)
-            msg = f'{num} image(s) could not be opened.<br/>'
+            msg = f"{num} image(s) could not be opened.<br/>"
             QtWidgets.QMessageBox.warning(
-                self,
-                'Problem loading images',
-                msg + IMG_LOADING_ERROR_MSG + errornames)
+                self, "Problem loading images", msg + IMG_LOADING_ERROR_MSG + errornames
+            )
         self.scene.add_queued_items()
         self.scene.arrange_default()
         self.undo_stack.endMacro()
         if new_scene:
             self.on_action_fit_scene()
 
-    def do_insert_images(self, filenames, pos=None):
-        if not pos:
+    def do_insert_images(
+        self, filenames: list[Any] | Any, pos: QtCore.QPoint | None = None
+    ) -> None:
+        if pos is None:
             pos = self.get_view_center()
         self.scene.deselect_all_items()
-        self.undo_stack.beginMacro('Insert Images')
+        self.undo_stack.beginMacro("Insert Images")
         self.worker = fileio.ThreadedIO(
-            fileio.load_images,
-            filenames,
-            self.mapToScene(pos),
-            self.scene)
+            fileio.load_images, filenames, self.mapToScene(pos), self.scene
+        )
         self.worker.progress.connect(self.on_items_loaded)
         self.worker.finished.connect(
-            partial(self.on_insert_images_finished,
-                    not self.scene.items()))
+            partial(self.on_insert_images_finished, not self.scene.items())
+        )
         self.progress = widgets.BeeProgressDialog(
-            'Loading images',
-            worker=self.worker,
-            parent=self)
+            "Loading images", worker=self.worker, parent=self
+        )
         self.worker.start()
 
-    def on_action_insert_images(self):
+    def on_action_insert_images(self) -> None:
         self.cancel_active_modes()
         formats = self.get_supported_image_formats(QtGui.QImageReader)
-        logger.debug(f'Supported image types for reading: {formats}')
+        logger.debug(f"Supported image types for reading: {formats}")
         filenames, f = QtWidgets.QFileDialog.getOpenFileNames(
             parent=self,
-            caption='Select one or more images to open',
-            filter=f'Images ({formats})')
+            caption="Select one or more images to open",
+            filter=f"Images ({formats})",
+        )
         self.do_insert_images(filenames)
 
-    def on_action_insert_text(self):
+    def on_action_insert_text(self) -> None:
         self.cancel_active_modes()
         item = BeeTextItem()
         pos = self.mapToScene(self.mapFromGlobal(self.cursor().pos()))
@@ -643,10 +671,11 @@ class BeeGraphicsView(MainControlsMixin,
         cursor.select(QtGui.QTextCursor.SelectionType.Document)
         item.setTextCursor(cursor)
 
-    def on_action_copy(self):
-        logger.debug('Copying to clipboard...')
+    def on_action_copy(self) -> None:
+        logger.debug("Copying to clipboard...")
         self.cancel_active_modes()
         clipboard = QtWidgets.QApplication.clipboard()
+        assert clipboard is not None
         items = self.scene.selectedItems(user_only=True)
 
         # At the moment, we can only copy one image to the global
@@ -659,18 +688,22 @@ class BeeGraphicsView(MainControlsMixin,
 
         # We set a marker for ourselves in the global clipboard so
         # that we know to look up the internal clipboard when pasting:
-        clipboard.mimeData().setData(
-            'beeref/items', QtCore.QByteArray.number(len(items)))
+        mime = clipboard.mimeData()
+        assert mime is not None
+        mime.setData("beeref/items", QtCore.QByteArray.number(len(items)))
 
-    def on_action_paste(self):
+    def on_action_paste(self) -> None:
         self.cancel_active_modes()
-        logger.debug('Pasting from clipboard...')
+        logger.debug("Pasting from clipboard...")
         clipboard = QtWidgets.QApplication.clipboard()
+        assert clipboard is not None
         pos = self.mapToScene(self.mapFromGlobal(self.cursor().pos()))
 
         # See if we need to look up the internal clipboard:
-        data = clipboard.mimeData().data('beeref/items')
-        logger.debug(f'Custom data in clipboard: {data}')
+        mime = clipboard.mimeData()
+        assert mime is not None
+        data = mime.data("beeref/items")
+        logger.debug(f"Custom data in clipboard: {data}")
         if data and self.scene.internal_clipboard:
             # Checking that internal clipboard exists since the user
             # may have opened a new scene since copying.
@@ -692,29 +725,33 @@ class BeeGraphicsView(MainControlsMixin,
             self.undo_stack.push(commands.InsertItems(self.scene, [item], pos))
             return
 
-        msg = 'No image data or text in clipboard or image too big'
+        msg = "No image data or text in clipboard or image too big"
         logger.info(msg)
         widgets.BeeNotification(self, msg)
 
-    def on_selection_changed(self):
-        logger.debug('Currently selected items: %s',
-                     len(self.scene.selectedItems(user_only=True)))
-        self.actiongroup_set_enabled('active_when_selection',
-                                     self.scene.has_selection())
-        self.actiongroup_set_enabled('active_when_single_image',
-                                     self.scene.has_single_image_selection())
+    def on_selection_changed(self) -> None:
+        logger.debug(
+            "Currently selected items: %s",
+            len(self.scene.selectedItems(user_only=True)),
+        )
+        self.actiongroup_set_enabled(
+            "active_when_selection", self.scene.has_selection()
+        )
+        self.actiongroup_set_enabled(
+            "active_when_single_image", self.scene.has_single_image_selection()
+        )
 
-        self.viewport().repaint()
+        self.require_viewport().repaint()
 
-    def on_cursor_changed(self, cursor):
+    def on_cursor_changed(self, cursor: QtGui.QCursor) -> None:
         if self.active_mode is None:
-            self.viewport().setCursor(cursor)
+            self.require_viewport().setCursor(cursor)
 
-    def on_cursor_cleared(self):
+    def on_cursor_cleared(self) -> None:
         if self.active_mode is None:
-            self.viewport().unsetCursor()
+            self.require_viewport().unsetCursor()
 
-    def recalc_scene_rect(self):
+    def recalc_scene_rect(self) -> None:
         """Resize the scene rectangle so that it is always one view width
         wider than all items' bounding box at each side and one view
         width higher on top and bottom. This gives the impression of
@@ -722,24 +759,30 @@ class BeeGraphicsView(MainControlsMixin,
 
         if self.previous_transform:
             return
-        logger.trace('Recalculating scene rectangle...')
+        logger.trace("Recalculating scene rectangle...")
         try:
-            topleft = self.mapFromScene(
-                self.scene.itemsBoundingRect().topLeft())
-            topleft = self.mapToScene(QtCore.QPoint(
-                topleft.x() - self.size().width(),
-                topleft.y() - self.size().height()))
+            topleft = self.mapFromScene(self.scene.itemsBoundingRect().topLeft())
+            topleft = self.mapToScene(
+                QtCore.QPoint(
+                    topleft.x() - self.size().width(),
+                    topleft.y() - self.size().height(),
+                )
+            )
             bottomright = self.mapFromScene(
-                self.scene.itemsBoundingRect().bottomRight())
-            bottomright = self.mapToScene(QtCore.QPoint(
-                bottomright.x() + self.size().width(),
-                bottomright.y() + self.size().height()))
+                self.scene.itemsBoundingRect().bottomRight()
+            )
+            bottomright = self.mapToScene(
+                QtCore.QPoint(
+                    bottomright.x() + self.size().width(),
+                    bottomright.y() + self.size().height(),
+                )
+            )
             self.setSceneRect(QtCore.QRectF(topleft, bottomright))
         except OverflowError:
-            logger.info('Maximum scene size reached')
-        logger.trace('Done recalculating scene rectangle')
+            logger.info("Maximum scene size reached")
+        logger.trace("Done recalculating scene rectangle")
 
-    def get_zoom_size(self, func):
+    def get_zoom_size(self, func: Callable[[float, float], float]) -> float:
         """Calculates the size of all items' bounding box in the view's
         coordinates.
 
@@ -751,34 +794,33 @@ class BeeGraphicsView(MainControlsMixin,
             arguments and turns it into a number, for ex. ``min`` or ``max``.
         """
 
-        topleft = self.mapFromScene(
-            self.scene.itemsBoundingRect().topLeft())
-        bottomright = self.mapFromScene(
-            self.scene.itemsBoundingRect().bottomRight())
-        return func(bottomright.x() - topleft.x(),
-                    bottomright.y() - topleft.y())
+        topleft = self.mapFromScene(self.scene.itemsBoundingRect().topLeft())
+        bottomright = self.mapFromScene(self.scene.itemsBoundingRect().bottomRight())
+        return func(bottomright.x() - topleft.x(), bottomright.y() - topleft.y())
 
-    def scale(self, *args, **kwargs):
+    def scale(self, *args: Any, **kwargs: Any) -> None:
         super().scale(*args, **kwargs)
         self.scene.on_view_scale_change()
         self.recalc_scene_rect()
 
-    def get_scale(self):
+    def get_scale(self) -> float:
         return self.transform().m11()
 
-    def pan(self, delta):
+    def pan(self, delta: QtCore.QPointF | QtCore.QPoint) -> None:
         if not self.scene.items():
-            logger.debug('No items in scene; ignore pan')
+            logger.debug("No items in scene; ignore pan")
             return
 
         hscroll = self.horizontalScrollBar()
+        assert hscroll is not None
         hscroll.setValue(int(hscroll.value() + delta.x()))
         vscroll = self.verticalScrollBar()
+        assert vscroll is not None
         vscroll.setValue(int(vscroll.value() + delta.y()))
 
-    def zoom(self, delta, anchor):
+    def zoom(self, delta: float, anchor: QtCore.QPointF) -> None:
         if not self.scene.items():
-            logger.debug('No items in scene; ignore zoom')
+            logger.debug("No items in scene; ignore zoom")
             return
 
         # We calculate where the anchor is before and after the zoom
@@ -786,9 +828,8 @@ class BeeGraphicsView(MainControlsMixin,
         # We can't use QGraphicsView's AnchorUnderMouse since it
         # uses the current cursor position while we need the initial mouse
         # press position for zooming with Ctrl + Middle Drag
-        anchor = QtCore.QPoint(round(anchor.x()),
-                               round(anchor.y()))
-        ref_point = self.mapToScene(anchor)
+        anchor_point = QtCore.QPoint(round(anchor.x()), round(anchor.y()))
+        ref_point = self.mapToScene(anchor_point)
         if delta == 0:
             return
         factor = 1 + abs(delta / 1000)
@@ -796,64 +837,65 @@ class BeeGraphicsView(MainControlsMixin,
             if self.get_zoom_size(max) < 10000000:
                 self.scale(factor, factor)
             else:
-                logger.debug('Maximum zoom size reached')
+                logger.debug("Maximum zoom size reached")
                 return
         else:
             if self.get_zoom_size(min) > 50:
-                self.scale(1/factor, 1/factor)
+                self.scale(1 / factor, 1 / factor)
             else:
-                logger.debug('Minimum zoom size reached')
+                logger.debug("Minimum zoom size reached")
                 return
 
-        self.pan(self.mapFromScene(ref_point) - anchor)
+        self.pan(self.mapFromScene(ref_point) - anchor_point)
         self.reset_previous_transform()
 
-    def wheelEvent(self, event):
-        action, inverted\
-            = self.keyboard_settings.mousewheel_action_for_event(event)
+    def wheelEvent(self, event: QtGui.QWheelEvent | None) -> None:
+        assert event is not None
+        action, inverted = self.keyboard_settings.mousewheel_action_for_event(event)
 
         delta = event.angleDelta().y()
         if inverted:
             delta = delta * -1
 
-        if action == 'zoom':
+        if action == "zoom":
             self.zoom(delta, event.position())
             event.accept()
             return
-        if action == 'pan_horizontal':
+        if action == "pan_horizontal":
             self.pan(QtCore.QPointF(0, 0.5 * delta))
             event.accept()
             return
-        if action == 'pan_vertical':
+        if action == "pan_vertical":
             self.pan(QtCore.QPointF(0.5 * delta, 0))
             event.accept()
             return
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QtGui.QMouseEvent | None) -> None:
+        assert event is not None
         if self.mousePressEventMainControls(event):
             return
 
         if self.active_mode == self.SAMPLE_COLOR_MODE:
-            if (event.button() == Qt.MouseButton.LeftButton):
-                color = self.scene.sample_color_at(
-                    self.mapToScene(event.pos()))
+            if event.button() == Qt.MouseButton.LeftButton:
+                color = self.scene.sample_color_at(self.mapToScene(event.pos()))
                 if color:
                     name = qcolor_to_hex(color)
                     clipboard = QtWidgets.QApplication.clipboard()
+                    assert clipboard is not None
                     clipboard.setText(name)
                     self.scene.internal_clipboard = []
-                    msg = f'Copied color to clipboard: {name}'
+                    msg = f"Copied color to clipboard: {name}"
                     logger.debug(msg)
                     widgets.BeeNotification(self, msg)
                 else:
-                    logger.debug('No color found')
+                    logger.debug("No color found")
             self.cancel_sample_color_mode()
             event.accept()
             return
 
         action, inverted = self.keyboard_settings.mouse_action_for_event(event)
 
-        if action == 'zoom':
+        if action == "zoom":
             self.active_mode = self.ZOOM_MODE
             self.event_start = event.position()
             self.event_anchor = event.position()
@@ -861,11 +903,11 @@ class BeeGraphicsView(MainControlsMixin,
             event.accept()
             return
 
-        if action == 'pan':
-            logger.trace('Begin pan')
+        if action == "pan":
+            logger.trace("Begin pan")
             self.active_mode = self.PAN_MODE
             self.event_start = event.position()
-            self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+            self.require_viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
             # ClosedHandCursor and OpenHandCursor don't work, but I
             # don't know if that's only on my system or a general
             # problem. It works with other cursors.
@@ -874,7 +916,8 @@ class BeeGraphicsView(MainControlsMixin,
 
         super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent | None) -> None:
+        assert event is not None
         if self.active_mode == self.PAN_MODE:
             self.reset_previous_transform()
             pos = event.position()
@@ -895,9 +938,10 @@ class BeeGraphicsView(MainControlsMixin,
             return
 
         if self.active_mode == self.SAMPLE_COLOR_MODE:
-            self.sample_color_widget.update(
+            self.sample_color_widget.update_sample(
                 event.position(),
-                self.scene.sample_color_at(self.mapToScene(event.pos())))
+                self.scene.sample_color_at(self.mapToScene(event.pos())),
+            )
             event.accept()
             return
 
@@ -905,10 +949,11 @@ class BeeGraphicsView(MainControlsMixin,
             return
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(self, event: QtGui.QMouseEvent | None) -> None:
+        assert event is not None
         if self.active_mode == self.PAN_MODE:
-            logger.trace('End pan')
-            self.viewport().unsetCursor()
+            logger.trace("End pan")
+            self.require_viewport().unsetCursor()
             self.active_mode = None
             event.accept()
             return
@@ -920,12 +965,13 @@ class BeeGraphicsView(MainControlsMixin,
             return
         super().mouseReleaseEvent(event)
 
-    def resizeEvent(self, event):
+    def resizeEvent(self, event: QtGui.QResizeEvent | None) -> None:
         super().resizeEvent(event)
         self.recalc_scene_rect()
         self.welcome_overlay.resize(self.size())
 
-    def keyPressEvent(self, event):
+    def keyPressEvent(self, event: QtGui.QKeyEvent | None) -> None:
+        assert event is not None
         if self.keyPressEventMainControls(event):
             return
         if self.active_mode == self.SAMPLE_COLOR_MODE:

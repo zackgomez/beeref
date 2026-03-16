@@ -24,7 +24,6 @@ https://www.sqlite.org/sqlar.html
 """
 
 import json
-import logging
 import os
 import pathlib
 import shutil
@@ -37,9 +36,10 @@ from beeref import constants
 from beeref.items import BeePixmapItem, BeeErrorItem
 from .errors import BeeFileIOError, IMG_LOADING_ERROR_MSG
 from .schema import SCHEMA, USER_VERSION, MIGRATIONS, APPLICATION_ID
+from beeref.logging import getLogger
 
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 def is_bee_file(path):

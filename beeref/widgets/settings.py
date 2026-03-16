@@ -13,9 +13,12 @@
 # You should have received a copy of the GNU General Public License
 # along with BeeRef.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 from functools import partial
 import logging
 import os
+from typing import Any, cast
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
@@ -31,11 +34,13 @@ logger = logging.getLogger(__name__)
 
 
 class GroupBase(QtWidgets.QGroupBox):
-    TITLE = None
-    HELPTEXT = None
-    KEY = None
+    layout: QtWidgets.QVBoxLayout
+    TITLE: str | None = None
+    HELPTEXT: str | None = None
+    KEY: str | None = None
+    ignore_value_changed: bool = False
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.settings = BeeSettings()
         self.update_title()
@@ -48,26 +53,29 @@ class GroupBase(QtWidgets.QGroupBox):
             helptxt.setWordWrap(True)
             self.layout.addWidget(helptxt)
 
-    def update_title(self):
-        title = [self.TITLE]
+    def update_title(self) -> None:
+        title: list[str] = [self.TITLE or ""]
         if self.settings.value_changed(self.KEY):
             title.append(constants.CHANGED_SYMBOL)
-        self.setTitle(' '.join(title))
+        self.setTitle(" ".join(title))
 
-    def on_value_changed(self, value):
+    def on_value_changed(self, value: Any) -> None:
         if self.ignore_value_changed:
             return
 
         value = self.convert_value_from_qt(value)
         if value != self.settings.valueOrDefault(self.KEY):
-            logger.debug(f'Setting {self.KEY} changed to: {value}')
+            logger.debug(f"Setting {self.KEY} changed to: {value}")
             self.settings.setValue(self.KEY, value)
             self.update_title()
 
-    def convert_value_from_qt(self, value):
+    def convert_value_from_qt(self, value: Any) -> Any:
         return value
 
-    def on_restore_defaults(self):
+    def set_value(self, value: Any) -> None:
+        raise NotImplementedError
+
+    def on_restore_defaults(self) -> None:
         new_value = self.settings.valueOrDefault(self.KEY)
         self.ignore_value_changed = True
         self.set_value(new_value)
@@ -76,14 +84,14 @@ class GroupBase(QtWidgets.QGroupBox):
 
 
 class RadioGroup(GroupBase):
-    OPTIONS = None
+    OPTIONS: tuple[tuple[str, str, str], ...] = ()
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
 
         self.ignore_value_changed = True
-        self.buttons = {}
-        for (value, label, helptext) in self.OPTIONS:
+        self.buttons: dict[str, QtWidgets.QRadioButton] = {}
+        for value, label, helptext in self.OPTIONS:
             btn = QtWidgets.QRadioButton(label)
             self.buttons[value] = btn
             btn.setToolTip(helptext)
@@ -95,16 +103,16 @@ class RadioGroup(GroupBase):
         self.ignore_value_changed = False
         self.layout.addStretch(100)
 
-    def set_value(self, value):
+    def set_value(self, value: Any) -> None:
         for old_value, btn in self.buttons.items():
             btn.setChecked(old_value == value)
 
 
 class IntegerGroup(GroupBase):
-    MIN = None
-    MAX = None
+    MIN: int = 0
+    MAX: int = 0
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.input = QtWidgets.QSpinBox()
         self.input.setRange(self.MIN, self.MAX)
@@ -114,14 +122,14 @@ class IntegerGroup(GroupBase):
         self.layout.addStretch(100)
         self.ignore_value_changed = False
 
-    def set_value(self, value):
+    def set_value(self, value: Any) -> None:
         self.input.setValue(value)
 
 
 class SingleCheckboxGroup(GroupBase):
-    LABEL = None
+    LABEL: str | None = None
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.input = QtWidgets.QCheckBox(self.LABEL)
         self.set_value(self.settings.valueOrDefault(self.KEY))
@@ -130,72 +138,80 @@ class SingleCheckboxGroup(GroupBase):
         self.layout.addStretch(100)
         self.ignore_value_changed = False
 
-    def set_value(self, value):
+    def set_value(self, value: Any) -> None:
         self.input.setChecked(value)
 
-    def convert_value_from_qt(self, value):
+    def convert_value_from_qt(self, value: Any) -> bool:
         return value == Qt.CheckState.Checked
 
 
 class ArrangeDefaultWidget(RadioGroup):
-    TITLE = 'Default Arrange Method:'
-    HELPTEXT = ('How images are arranged when inserted in batch')
-    KEY = 'Items/arrange_default'
+    TITLE = "Default Arrange Method:"
+    HELPTEXT = "How images are arranged when inserted in batch"
+    KEY = "Items/arrange_default"
     OPTIONS = (
-        ('optimal', 'Optimal', 'Arrange Optimal'),
-        ('horizontal', 'Horizontal (by filename)',
-         'Arrange Horizontal (by filename)'),
-        ('vertical', 'Vertical (by filename)',
-         'Arrange Vertical (by filename)'),
-        ('square', 'Square (by filename)', 'Arrannge Square (by filename)'))
+        ("optimal", "Optimal", "Arrange Optimal"),
+        ("horizontal", "Horizontal (by filename)", "Arrange Horizontal (by filename)"),
+        ("vertical", "Vertical (by filename)", "Arrange Vertical (by filename)"),
+        ("square", "Square (by filename)", "Arrannge Square (by filename)"),
+    )
 
 
 class ImageStorageFormatWidget(RadioGroup):
-    TITLE = 'Image Storage Format:'
-    HELPTEXT = ('How images are stored inside bee files.'
-                ' Changes will only take effect on newly saved images.')
-    KEY = 'Items/image_storage_format'
+    TITLE = "Image Storage Format:"
+    HELPTEXT = (
+        "How images are stored inside bee files."
+        " Changes will only take effect on newly saved images."
+    )
+    KEY = "Items/image_storage_format"
     OPTIONS = (
-        ('best', 'Best Guess',
-         ('Small images and images with alpha channel are stored as png,'
-          ' everything else as jpg')),
-        ('png', 'Always PNG', 'Lossless, but large bee file'),
-        ('jpg', 'Always JPG',
-         'Small bee file, but lossy and no transparency support'))
+        (
+            "best",
+            "Best Guess",
+            (
+                "Small images and images with alpha channel are stored as png,"
+                " everything else as jpg"
+            ),
+        ),
+        ("png", "Always PNG", "Lossless, but large bee file"),
+        ("jpg", "Always JPG", "Small bee file, but lossy and no transparency support"),
+    )
 
 
 class ArrangeGapWidget(IntegerGroup):
-    TITLE = 'Arrange Gap:'
-    HELPTEXT = ('The gap between images when using arrange actions.')
-    KEY = 'Items/arrange_gap'
+    TITLE = "Arrange Gap:"
+    HELPTEXT = "The gap between images when using arrange actions."
+    KEY = "Items/arrange_gap"
     MIN = 0
     MAX = 200
 
 
 class AllocationLimitWidget(IntegerGroup):
-    TITLE = 'Maximum Image Size:'
-    HELPTEXT = ('The maximum image size that can be loaded (in megabytes). '
-                'Set to 0 for no limitation.')
-    KEY = 'Items/image_allocation_limit'
+    TITLE = "Maximum Image Size:"
+    HELPTEXT = (
+        "The maximum image size that can be loaded (in megabytes). "
+        "Set to 0 for no limitation."
+    )
+    KEY = "Items/image_allocation_limit"
     MIN = 0
     MAX = 10000
 
 
 class ConfirmCloseUnsavedWidget(SingleCheckboxGroup):
-    TITLE = 'Confirm when closing an unsaved file:'
+    TITLE = "Confirm when closing an unsaved file:"
     HELPTEXT = (
-        'When about to close an unsaved file, should BeeRef ask for '
-        'confirmation?')
-    LABEL = 'Confirm when closing'
-    KEY = 'Save/confirm_close_unsaved'
+        "When about to close an unsaved file, should BeeRef ask for confirmation?"
+    )
+    LABEL = "Confirm when closing"
+    KEY = "Save/confirm_close_unsaved"
 
 
 class CanvasColorWidget(GroupBase):
-    TITLE = 'Canvas Color:'
-    HELPTEXT = 'The background color of the canvas.'
-    KEY = 'View/canvas_color'
+    TITLE = "Canvas Color:"
+    HELPTEXT = "The background color of the canvas."
+    KEY = "View/canvas_color"
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.ignore_value_changed = False
         self.btn = QtWidgets.QPushButton()
@@ -205,27 +221,29 @@ class CanvasColorWidget(GroupBase):
         self.layout.addWidget(self.btn)
         self.layout.addStretch(100)
 
-    def on_pick_color(self):
+    def on_pick_color(self) -> None:
         color = QtWidgets.QColorDialog.getColor(
             QtGui.QColor(self.settings.valueOrDefault(self.KEY)),
             self.parentWidget(),
-            'Canvas Color')
+            "Canvas Color",
+        )
         if color.isValid():
             self.on_value_changed(color.name())
             self._update_swatch(color.name())
 
-    def set_value(self, value):
+    def set_value(self, value: Any) -> None:
         self._update_swatch(value)
 
-    def _update_swatch(self, color_str):
+    def _update_swatch(self, color_str: str) -> None:
         self.btn.setStyleSheet(
-            f'background-color: {color_str}; border: 1px solid #888;')
+            f"background-color: {color_str}; border: 1px solid #888;"
+        )
 
 
 class SettingsDialog(QtWidgets.QDialog):
-    def __init__(self, parent):
+    def __init__(self, parent: QtWidgets.QWidget) -> None:
         super().__init__(parent)
-        self.setWindowTitle(f'{constants.APPNAME} Settings')
+        self.setWindowTitle(f"{constants.APPNAME} Settings")
         tabs = QtWidgets.QTabWidget()
 
         # Miscellaneous
@@ -233,10 +251,10 @@ class SettingsDialog(QtWidgets.QDialog):
         misc_layout = QtWidgets.QVBoxLayout()
         misc.setLayout(misc_layout)
         misc_buttons = QtWidgets.QHBoxLayout()
-        open_dir_btn = QtWidgets.QPushButton('Open Settings Folder')
+        open_dir_btn = QtWidgets.QPushButton("Open Settings Folder")
         open_dir_btn.clicked.connect(self.on_open_settings_dir)
         misc_buttons.addWidget(open_dir_btn)
-        debuglog_btn = QtWidgets.QPushButton('Show Debug Log')
+        debuglog_btn = QtWidgets.QPushButton("Show Debug Log")
         debuglog_btn.clicked.connect(self.on_show_debuglog)
         misc_buttons.addWidget(debuglog_btn)
         misc_layout.addLayout(misc_buttons)
@@ -244,7 +262,7 @@ class SettingsDialog(QtWidgets.QDialog):
         misc_grid.addWidget(ConfirmCloseUnsavedWidget(), 0, 0)
         misc_grid.addWidget(CanvasColorWidget(), 0, 1)
         misc_layout.addLayout(misc_grid)
-        tabs.addTab(misc, '&Miscellaneous')
+        tabs.addTab(misc, "&Miscellaneous")
 
         # Images & Items
         items = QtWidgets.QWidget()
@@ -254,7 +272,7 @@ class SettingsDialog(QtWidgets.QDialog):
         items_layout.addWidget(AllocationLimitWidget(), 0, 1)
         items_layout.addWidget(ArrangeGapWidget(), 1, 0)
         items_layout.addWidget(ArrangeDefaultWidget(), 1, 1)
-        tabs.addTab(items, '&Images && Items')
+        tabs.addTab(items, "&Images && Items")
 
         # Keyboard shortcuts
         keyboard = QtWidgets.QWidget()
@@ -262,11 +280,12 @@ class SettingsDialog(QtWidgets.QDialog):
         keyboard.setLayout(kb_layout)
         table = KeyboardShortcutsView(keyboard)
         search_input = QtWidgets.QLineEdit()
-        search_input.setPlaceholderText('Search...')
-        search_input.textChanged.connect(table.model().setFilterFixedString)
+        search_input.setPlaceholderText("Search...")
+        kb_proxy = cast(QtCore.QSortFilterProxyModel, table.model())
+        search_input.textChanged.connect(kb_proxy.setFilterFixedString)
         kb_layout.addWidget(search_input)
         kb_layout.addWidget(table)
-        tabs.addTab(keyboard, '&Keyboard Shortcuts')
+        tabs.addTab(keyboard, "&Keyboard Shortcuts")
 
         # Mouse controls
         mouse = QtWidgets.QWidget()
@@ -274,11 +293,12 @@ class SettingsDialog(QtWidgets.QDialog):
         mouse.setLayout(mouse_layout)
         table = MouseView(mouse)
         search_input = QtWidgets.QLineEdit()
-        search_input.setPlaceholderText('Search...')
-        search_input.textChanged.connect(table.model().setFilterFixedString)
+        search_input.setPlaceholderText("Search...")
+        mouse_proxy = cast(QtCore.QSortFilterProxyModel, table.model())
+        search_input.textChanged.connect(mouse_proxy.setFilterFixedString)
         mouse_layout.addWidget(search_input)
         mouse_layout.addWidget(table)
-        tabs.addTab(mouse, '&Mouse')
+        tabs.addTab(mouse, "&Mouse")
 
         # Mouse wheel controls
         mousewheel = QtWidgets.QWidget()
@@ -286,11 +306,12 @@ class SettingsDialog(QtWidgets.QDialog):
         mousewheel.setLayout(wheel_layout)
         table = MouseWheelView(mousewheel)
         search_input = QtWidgets.QLineEdit()
-        search_input.setPlaceholderText('Search...')
-        search_input.textChanged.connect(table.model().setFilterFixedString)
+        search_input.setPlaceholderText("Search...")
+        wheel_proxy = cast(QtCore.QSortFilterProxyModel, table.model())
+        search_input.textChanged.connect(wheel_proxy.setFilterFixedString)
         wheel_layout.addWidget(search_input)
         wheel_layout.addWidget(table)
-        tabs.addTab(mousewheel, 'Mouse &Wheel')
+        tabs.addTab(mousewheel, "Mouse &Wheel")
 
         layout = QtWidgets.QVBoxLayout()
         self.setLayout(layout)
@@ -298,31 +319,32 @@ class SettingsDialog(QtWidgets.QDialog):
 
         # Bottom row of buttons
         buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Close)
+            QtWidgets.QDialogButtonBox.StandardButton.Close
+        )
         buttons.rejected.connect(self.reject)
-        reset_btn = QtWidgets.QPushButton('&Restore Defaults')
+        reset_btn = QtWidgets.QPushButton("&Restore Defaults")
         reset_btn.setAutoDefault(False)
         reset_btn.clicked.connect(self.on_restore_defaults)
-        buttons.addButton(reset_btn,
-                          QtWidgets.QDialogButtonBox.ButtonRole.ActionRole)
+        buttons.addButton(reset_btn, QtWidgets.QDialogButtonBox.ButtonRole.ActionRole)
 
         layout.addWidget(buttons)
         self.show()
 
-    def on_open_settings_dir(self):
+    def on_open_settings_dir(self) -> None:
         dirname = os.path.dirname(BeeSettings().fileName())
-        QtGui.QDesktopServices.openUrl(
-            QtCore.QUrl.fromLocalFile(dirname))
+        QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(dirname))
 
-    def on_show_debuglog(self):
+    def on_show_debuglog(self) -> None:
         from beeref.widgets import DebugLogDialog
+
         DebugLogDialog(self)
 
-    def on_restore_defaults(self, *args, **kwargs):
+    def on_restore_defaults(self, *args: Any, **kwargs: Any) -> None:
         reply = QtWidgets.QMessageBox.question(
             self,
-            'Restore defaults?',
-            'Do you want to restore all settings to their default values?')
+            "Restore defaults?",
+            "Do you want to restore all settings to their default values?",
+        )
 
         if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             BeeSettings().restore_defaults()
