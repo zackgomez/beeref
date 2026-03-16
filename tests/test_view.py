@@ -8,7 +8,6 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
 from beeref import commands, widgets
-from beeref.actions import actions
 from beeref.config import logfile_name
 from beeref.items import BeePixmapItem, BeeTextItem
 from beeref.view import BeeGraphicsView

@@ -21,7 +21,7 @@ import os.path
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
-from beeref.actions import ActionsMixin, actions
+from beeref.actions import ActionsMixin
 from beeref import commands
 from beeref.config import CommandlineArgs, BeeSettings, KeyboardSettings
 from beeref import constants

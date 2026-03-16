@@ -1,6 +1,5 @@
 import math
 import os.path
-from unittest.mock import patch
 
 import httpretty
 import pytest

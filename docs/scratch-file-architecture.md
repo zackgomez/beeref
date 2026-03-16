@@ -6,13 +6,27 @@ BeeRef currently keeps all image data in memory and writes to the .bee file only
 
 This design introduces a scratch file (working copy) pattern — the same approach Photoshop uses with its scratch disk. The working copy is always reasonably current, Save is cheap, and crash recovery is free.
 
+## File naming
+
+The working copy sits next to the original with a `.swp` extension, unhidden:
+
+```
+file.bee          — the user's file (untouched until Save)
+file.bee.swp      — working copy (always current)
+file.bee.saving   — transient copy during Save (exists only during the copy+rename)
+```
+
+Unhidden because: works the same on all platforms (no Windows hidden attribute dance), universally recognizable as a temp file, easier to find for manual recovery.
+
+The `.swp` file's presence on disk is the crash-recovery signal — on clean exit it's always deleted.
+
 ## How it works
 
 ### Open
 
 1. Read metadata from original .bee file (read-only, fast — items table only, no blobs)
 2. Show placeholders, `fit_scene()`
-3. Background: copy original .bee → working copy (e.g., `file.bee.working`)
+3. Background: copy original .bee → `file.bee.swp`
 4. Background: VACUUM the working copy (compacts free pages, runs while user is orienting)
 5. When copy finishes: start `ImageLoader` against the working copy
 
@@ -31,39 +45,44 @@ Scene is in-memory as today. Changes accumulate in the undo stack. Periodically 
 ### Save
 
 1. Final drain (flush any pending changes to working copy)
-2. `os.replace(working_copy, original)` — atomic rename on same filesystem
-3. Start a new working copy from the now-current original (or just keep using the same file)
+2. Copy working copy → `file.bee.saving` (temp file)
+3. `os.replace(file.bee.saving, file.bee)` — atomic swap of the original
+4. Working copy stays intact, we keep operating against it
 
-Save is near-instant. No blob re-encoding, no VACUUM.
+The working copy is never moved or invalidated. The original gets atomically replaced by a clean snapshot. If the copy in step 2 fails or we crash mid-copy, the original is untouched and the working copy is still valid. The `.saving` file only exists transiently — if found on startup, it's a partial write and should be deleted.
 
 ### Save-As
 
 1. Final drain
-2. `shutil.copy(working_copy, new_path)`
+2. Copy working copy → new path
 3. Continue operating against the working copy (or switch to a new working copy of the new file)
 
 Works with placeholders — blobs are in the working copy's sqlar, not in memory.
 
 ### Crash recovery
 
-On open, check for `file.bee.working`. If it exists:
+On open, check for `file.bee.swp`. If it exists:
 - The previous session crashed (or was killed)
 - Offer to recover: "Found unsaved changes from a previous session. Recover?"
 - Yes → open the working copy as the source instead of the original
 - No → delete the working copy, open the original normally
 
+Also delete any stale `file.bee.saving` found on startup (partial Save that didn't complete).
+
 ### Close / New Scene
 
 1. Final drain (if user chose to save)
-2. Delete the working copy
+2. Delete the working copy (`file.bee.swp`)
 3. Clean up ImageLoader and SQLite connections
+
+On clean exit, no `.swp` file remains.
 
 ## Interaction with async loading
 
 The scratch file is the single source for blob reads:
 
 ```
-Original .bee                Working copy (.bee.working)
+Original .bee                Working copy (.bee.swp)
   (read-only)                  (read-write)
       |                              |
   read metadata              copy from original (bg)
@@ -73,7 +92,7 @@ Original .bee                Working copy (.bee.working)
       |                       drains write metadata
       |                       new image blobs written
       |                              |
-  Save: --------atomic rename--------+
+  Save: ---copy to .saving, rename-->  original
 ```
 
 The `ImageLoader` always reads from the working copy. Drains write to the working copy. No contention with the original file after the initial copy.
@@ -88,7 +107,7 @@ SQLite in WAL mode handles this cleanly — concurrent readers + one writer. Wit
 
 ## Disk cost
 
-Temporary 2x file size during operation (original + working copy). For a 500MB .bee file, that's 500MB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean close.
+Temporary 2x file size during operation (original + working copy), plus a brief 3x during Save (original + working copy + .saving). For a 500MB .bee file that's 500MB–1GB extra. Photoshop users routinely eat 10x+ scratch disk costs; this is modest by comparison. The working copy is deleted on clean exit, and the .saving file is transient.
 
 ## Future: mip storage
 
@@ -107,7 +126,7 @@ This is a follow-up to the basic placeholder/async loading. The sequence:
 2. **Second**: Scratch file
    - ImageLoader reads from working copy
    - Drain replaces explicit save logic
-   - Save = drain + atomic rename
+   - Save = drain + copy + atomic rename
    - Save-As = drain + copy
    - Crash recovery
 3. **Third**: Autosave timer + mip caching

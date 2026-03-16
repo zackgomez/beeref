@@ -1,13 +1,8 @@
 [Desktop Entry]
-Name=BeeRef
-GenericName=Image Viewer
-Comment=A simple reference image viewer
-Terminal=false
-Exec=/home/yourname/path/to/BeeRef-0.3.4-dev.appimage
 Type=Application
-Icon=/home/yourname/path/to/logo.png
-
+Name=BeeRef
+Comment=Reference image board
+Exec=beeref %f
+Icon=beeref
 MimeType=application/x-beeref;
-Categories=Qt;KDE;Graphics;
-X-KDE-NativeMimeType=application/x-beeref
-X-KDE-ExtraNativeMimeTypes=
+Categories=Graphics;

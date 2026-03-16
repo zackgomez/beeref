@@ -48,11 +48,19 @@ Follow further releases via the `atom feed <https://github.com/rbreu/beeref/rele
 Development Version
 ~~~~~~~~~~~~~~~~~~~
 
-To get the current development version, you need to have a working Python 3 environment. Run the following command to install the development version::
+To install the current development version, you need `uv <https://docs.astral.sh/uv/>`_::
 
-  pip install git+https://github.com/rbreu/beeref.git
+  uv tool install --editable git+https://github.com/rbreu/beeref.git
 
 Then run ``beeref`` or ``beeref filename.bee``.
+
+To add a desktop entry (Linux), copy the logo and desktop file::
+
+  mkdir -p ~/.local/share/applications
+  cp beeref.desktop ~/.local/share/applications/
+  cp beeref/assets/logo.png ~/.local/share/icons/beeref.png
+
+Then edit ``~/.local/share/applications/beeref.desktop`` to set the correct ``Exec`` and ``Icon`` paths.
 
 
 Features

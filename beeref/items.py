@@ -92,7 +92,7 @@ class BeeItemMixin(SelectableMixin):
     def on_selected_change(self, value):
         if (value and self.scene()
                 and not self.scene().has_selection()
-                and not self.scene().active_mode is None):
+                and self.scene().active_mode is not None):
             self.bring_to_front()
 
     def update_from_data(self, **kwargs):
