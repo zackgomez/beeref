@@ -22,7 +22,7 @@ import os
 import platform
 import signal
 import sys
-from typing import Any, Optional, cast
+from typing import Optional, cast
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
@@ -39,9 +39,10 @@ class BeeRefApplication(QtWidgets.QApplication):
     def event(self, event: Optional[QtCore.QEvent]) -> bool:
         assert event is not None
         if event.type() == QtCore.QEvent.Type.FileOpen:
+            file_event = cast(QtGui.QFileOpenEvent, event)
             for widget in self.topLevelWidgets():
                 if isinstance(widget, BeeRefMainWindow):
-                    widget.view.open_from_file(cast(Any, event).file())
+                    widget.view.open_from_file(file_event.file())
                     return True
             return False
         else:
