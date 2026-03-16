@@ -195,7 +195,7 @@ class SelectableMixin(BaseItemMixin):
     viewport_scale: float
     active_mode: int | None
     is_editable: bool
-    _view_scale: float
+    _view_scale: float = 1
     event_start: QtCore.QPointF
     event_direction: QtCore.QPointF
     event_anchor: QtCore.QPointF
@@ -242,7 +242,7 @@ class SelectableMixin(BaseItemMixin):
         # It can happen that the item is already removed from
         # the scene but its boundingRect is still needed. Keep the
         # last known scaling factor for that case
-        return value / getattr(self, "_view_scale", 1) / self.scale()
+        return value / self._view_scale / self.scale()
 
     @property
     def select_resize_size(self) -> float:

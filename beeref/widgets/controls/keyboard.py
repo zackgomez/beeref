@@ -92,14 +92,13 @@ class KeyboardShortcutsDelegate(QtWidgets.QStyledItemDelegate):
         model: QtCore.QAbstractItemModel | None,
         index: QtCore.QModelIndex,
     ) -> None:
-        assert editor is not None
+        assert isinstance(editor, KeyboardShortcutsEditor)
         assert model is not None
-        kb_editor = cast(KeyboardShortcutsEditor, editor)
-        cast(Any, model).setData(
+        cast(KeyboardShortcutsModel, model).setData(
             index,
-            kb_editor.keySequence(),
+            editor.keySequence(),
             QtCore.Qt.ItemDataRole.EditRole,
-            remove_from_other=kb_editor.remove_from_other,
+            remove_from_other=editor.remove_from_other,
         )
 
 
@@ -218,7 +217,7 @@ class KeyboardShortcutsProxy(QtCore.QSortFilterProxyModel):
     ) -> bool:
         source_model = self.sourceModel()
         assert source_model is not None
-        result: bool = cast(Any, source_model).setData(
+        result: bool = cast(KeyboardShortcutsModel, source_model).setData(
             self.mapToSource(index), value, role, remove_from_other=remove_from_other
         )
         return result

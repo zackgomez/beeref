@@ -111,13 +111,11 @@ class MouseDelegate(QtWidgets.QStyledItemDelegate):
         parent: QtWidgets.QWidget | None,
         option: QtWidgets.QStyleOptionViewItem,
         index: QtCore.QModelIndex,
-    ) -> QtWidgets.QWidget | None:
+    ) -> MouseControlsEditor:
         assert parent is not None
-        widget = QtWidgets.QWidget(parent)
-        w = cast(Any, widget)
-        w.editor = MouseControlsEditor(widget, index)
-        w.editor.saved.connect(partial(self.setModelData, widget, index.model(), index))
-        return widget
+        editor = MouseControlsEditor(parent, index)
+        editor.saved.connect(partial(self.setModelData, editor, index.model(), index))
+        return editor
 
     def setModelData(
         self,
@@ -125,18 +123,17 @@ class MouseDelegate(QtWidgets.QStyledItemDelegate):
         model: QtCore.QAbstractItemModel | None,
         index: QtCore.QModelIndex,
     ) -> None:
-        assert editor is not None
+        assert isinstance(editor, MouseControlsEditor)
         assert model is not None
-        inner_editor: MouseControlsEditor = cast(Any, editor).editor
-        if inner_editor.result() == QtWidgets.QDialog.DialogCode.Accepted:
-            cast(Any, model).setData(
+        if editor.result() == QtWidgets.QDialog.DialogCode.Accepted:
+            cast(MouseModel, model).setData(
                 index,
                 {
-                    "button": inner_editor.get_button(),
-                    "modifiers": inner_editor.get_modifiers(),
+                    "button": editor.get_button(),
+                    "modifiers": editor.get_modifiers(),
                 },
                 QtCore.Qt.ItemDataRole.EditRole,
-                remove_from_other=inner_editor.remove_from_other,
+                remove_from_other=editor.remove_from_other,
             )
 
 
@@ -174,7 +171,7 @@ class MouseProxy(QtCore.QSortFilterProxyModel):
     ) -> bool:
         source_model = self.sourceModel()
         assert source_model is not None
-        result: bool = cast(Any, source_model).setData(
+        result: bool = cast(MouseModel, source_model).setData(
             self.mapToSource(index), value, role, remove_from_other=remove_from_other
         )
         return result
