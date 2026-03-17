@@ -23,6 +23,8 @@ from typing import Any, cast
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import Qt
 
+from beeref.widgets.debuglog import DebugLogDialog
+
 from beeref import constants
 from beeref.config import BeeSettings, KeyboardSettings, settings_events
 from beeref.widgets.controls.keyboard import KeyboardShortcutsView
@@ -335,8 +337,6 @@ class SettingsDialog(QtWidgets.QDialog):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(dirname))
 
     def on_show_debuglog(self) -> None:
-        from beeref.widgets import DebugLogDialog
-
         DebugLogDialog(self)
 
     def on_restore_defaults(self, *args: Any, **kwargs: Any) -> None:

@@ -23,13 +23,14 @@ from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
 
 from beeref import constants, commands
-from beeref.config import logfile_name
 from beeref.widgets import (  # noqa: F401
     controls,
+    debuglog,
     settings,
     welcome_overlay,
     color_gamut,
 )
+from beeref.widgets.debuglog import DebugLogDialog  # noqa: F401
 
 
 logger = logging.getLogger(__name__)
@@ -97,43 +98,6 @@ class HelpDialog(QtWidgets.QDialog):
         layout.addWidget(buttons)
 
         self.show()
-
-
-class DebugLogDialog(QtWidgets.QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        self.setWindowTitle(f"{constants.APPNAME} Debug Log")
-        with open(logfile_name()) as f:
-            self.log_txt = f.read()
-
-        self.log = QtWidgets.QPlainTextEdit(self.log_txt)
-        self.log.setReadOnly(True)
-
-        buttons = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Close
-        )
-        buttons.rejected.connect(self.reject)
-        self.copy_button = QtWidgets.QPushButton("Co&py To Clipboard")
-        self.copy_button.released.connect(self.copy_to_clipboard)
-        buttons.addButton(
-            self.copy_button, QtWidgets.QDialogButtonBox.ButtonRole.ActionRole
-        )
-
-        layout = QtWidgets.QVBoxLayout()
-        self.setLayout(layout)
-        name_widget = QtWidgets.QLabel(logfile_name())
-        name_widget.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        layout.addWidget(name_widget)
-        layout.addWidget(self.log)
-        layout.addWidget(buttons)
-        self.show()
-
-    def copy_to_clipboard(self):
-        clipboard = QtWidgets.QApplication.clipboard()
-        assert clipboard is not None
-        clipboard.setText(self.log_txt)
 
 
 class SceneToPixmapExporterDialog(QtWidgets.QDialog):
