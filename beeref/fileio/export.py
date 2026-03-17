@@ -20,36 +20,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from xml.etree import ElementTree as ET
 
-from PyQt6 import QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from .errors import BeeFileIOError
 from beeref import widgets
-from beeref.items import BeePixmapItem
+from beeref.items import BeePixmapItem, BeeTextItem
 from beeref.logging import getLogger
 
 if TYPE_CHECKING:
     from beeref.fileio import ThreadedIO
+    from beeref.scene import BeeGraphicsScene
 
 
 logger = getLogger(__name__)
-
-
-class ExporterRegistry(dict):
-    DEFAULT_TYPE = 0
-
-    def __getitem__(self, key):
-        key = key.removeprefix(".")
-        exp = self.get(key, super().__getitem__(self.DEFAULT_TYPE))
-        logger.debug(f"Exporter for type {key}: {exp}")
-        return exp
-
-
-exporter_registry = ExporterRegistry()
-
-
-def register_exporter(cls):
-    exporter_registry[cls.TYPE] = cls
-    return cls
 
 
 class ExporterBase:
@@ -90,7 +73,15 @@ class ExporterBase:
 class SceneExporterBase(ExporterBase):
     """For exporting the scene to a single image."""
 
-    def __init__(self, scene):
+    def get_user_input(self, parent: QtWidgets.QWidget) -> bool:
+        """Ask user for export parameters. Override in subclasses."""
+        raise NotImplementedError
+
+    def export(self, filename: Path, worker: ThreadedIO | None = None) -> None:
+        """Export the scene. Override in subclasses."""
+        raise NotImplementedError
+
+    def __init__(self, scene: BeeGraphicsScene) -> None:
         self.scene = scene
         self.scene.cancel_active_modes()
         self.scene.deselect_all_items()
@@ -107,11 +98,30 @@ class SceneExporterBase(ExporterBase):
         logger.debug(f"Default export size with margins: {self.default_size}")
 
 
+class ExporterRegistry(dict[str | int, type[SceneExporterBase]]):
+    DEFAULT_TYPE = 0
+
+    def __getitem__(self, key: str | int) -> type[SceneExporterBase]:
+        if isinstance(key, str):
+            key = key.removeprefix(".")
+        exp = self.get(key, super().__getitem__(self.DEFAULT_TYPE))
+        logger.debug(f"Exporter for type {key}: {exp}")
+        return exp
+
+
+exporter_registry = ExporterRegistry()
+
+
+def register_exporter[T: type[SceneExporterBase]](cls: T) -> T:
+    exporter_registry[cls.TYPE] = cls
+    return cls
+
+
 @register_exporter
 class SceneToPixmapExporter(SceneExporterBase):
     TYPE = ExporterRegistry.DEFAULT_TYPE
 
-    def get_user_input(self, parent):
+    def get_user_input(self, parent: QtWidgets.QWidget) -> bool:
         """Ask user for final export size."""
 
         dialog = widgets.SceneToPixmapExporterDialog(
@@ -126,7 +136,7 @@ class SceneToPixmapExporter(SceneExporterBase):
         else:
             return False
 
-    def render_to_image(self):
+    def render_to_image(self) -> QtGui.QImage:
         logger.debug(f"Final export size: {self.size}")
         margin = self.margin * self.size.width() / self.default_size.width()
         logger.debug(f"Final export margin: {margin}")
@@ -173,11 +183,11 @@ class SceneToPixmapExporter(SceneExporterBase):
 class SceneToSVGExporter(SceneExporterBase):
     TYPE = "svg"
 
-    def get_user_input(self, parent):
+    def get_user_input(self, parent: QtWidgets.QWidget) -> bool:
         self.size = self.default_size
         return True
 
-    def _get_textstyles(self, item):
+    def _get_textstyles(self, item: BeeTextItem) -> tuple[str, ...]:
         fontstylemap = {
             QtGui.QFont.Style.StyleNormal: "normal",
             QtGui.QFont.Style.StyleItalic: "italic",
@@ -198,7 +208,7 @@ class SceneToSVGExporter(SceneExporterBase):
             f"font-style:{fontstyle}",
         )
 
-    def render_to_svg(self, worker: ThreadedIO | None = None):
+    def render_to_svg(self, worker: ThreadedIO | None = None) -> ET.Element | None:
         svg = ET.Element(
             "svg",
             attrib={
@@ -298,7 +308,7 @@ class ImagesToDirectoryExporter(ExporterBase):
     not auto-detected by file extension.
     """
 
-    def __init__(self, scene, dirname: Path):
+    def __init__(self, scene: BeeGraphicsScene, dirname: Path) -> None:
         self.scene = scene
         self.dirname = dirname
         self.items = list(self.scene.items_by_type(BeePixmapItem.TYPE))

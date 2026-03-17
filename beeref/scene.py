@@ -20,7 +20,7 @@ import logging
 import math
 from pathlib import Path
 from queue import Queue
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Iterator, Literal, cast, overload
 
 from PyQt6 import QtCore, QtWidgets, QtGui
 from PyQt6.QtCore import Qt
@@ -30,7 +30,14 @@ import rpack
 from beeref import commands
 from beeref.config import BeeSettings
 from beeref.fileio.snapshot import ItemSnapshot
-from beeref.items import BeeItemMixin, item_registry, BeeErrorItem, sort_by_filename
+from beeref.items import (
+    BeeItemMixin,
+    BeePixmapItem,
+    BeeTextItem,
+    item_registry,
+    BeeErrorItem,
+    sort_by_filename,
+)
 from beeref.selection import MultiSelectItem, RubberbandItem
 
 if TYPE_CHECKING:
@@ -47,24 +54,25 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
     MOVE_MODE = 1
     RUBBERBAND_MODE = 2
 
-    def __init__(self, undo_stack):
+    def __init__(self, undo_stack: QtGui.QUndoStack) -> None:
         super().__init__()
-        self.active_mode = None
+        self.active_mode: int | None = None
         self.undo_stack = undo_stack
         self._scratch_file: Path | None = None
-        self.max_z = 0
-        self.min_z = 0
-        self.Z_STEP = 0.001
+        self.max_z: float = 0
+        self.min_z: float = 0
+        self.Z_STEP: float = 0.001
         self.selectionChanged.connect(self.on_selection_change)
         self.changed.connect(self.on_change)
-        self.items_to_add = Queue()
-        self.edit_item = None
-        self.crop_item = None
+        self.items_to_add: Queue[tuple[dict[str, Any], bool]] = Queue()
+        self.edit_item: BeeTextItem | None = None
+        self.crop_item: BeePixmapItem | None = None
+        self.internal_clipboard: list[BeeItemMixin] = []
         self.settings = BeeSettings()
         self.clear()
         self._clear_ongoing = False
 
-    def clear(self):
+    def clear(self) -> None:
         self._clear_ongoing = True
         super().clear()
         self.internal_clipboard = []
@@ -72,45 +80,45 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         self.multi_select_item = MultiSelectItem()
         self._clear_ongoing = False
 
-    def addItem(self, item):
+    def addItem(self, item: QtWidgets.QGraphicsItem) -> None:
         logger.debug(f"Adding item {item}")
         super().addItem(item)
 
-    def removeItem(self, item):
+    def removeItem(self, item: QtWidgets.QGraphicsItem) -> None:
         logger.debug(f"Removing item {item}")
         super().removeItem(item)
 
-    def cancel_active_modes(self):
+    def cancel_active_modes(self) -> None:
         """Cancels ongoing crop modes, rubberband modes etc, if there are
         any.
         """
         self.cancel_crop_mode()
         self.end_rubberband_mode()
 
-    def end_rubberband_mode(self):
+    def end_rubberband_mode(self) -> None:
         if self.rubberband_item.scene():
             logger.debug("Ending rubberband selection")
             self.removeItem(self.rubberband_item)
         self.active_mode = None
 
-    def cancel_crop_mode(self):
+    def cancel_crop_mode(self) -> None:
         """Cancels an ongoing crop mode, if there is any."""
         if self.crop_item:
             self.crop_item.exit_crop_mode(confirm=False)
 
-    def copy_selection_to_internal_clipboard(self):
+    def copy_selection_to_internal_clipboard(self) -> None:
         self.internal_clipboard = []
         for item in self.selectedItems(user_only=True):
             self.internal_clipboard.append(item)
 
-    def paste_from_internal_clipboard(self, position):
+    def paste_from_internal_clipboard(self, position: QtCore.QPointF) -> None:
         copies = []
         for item in self.internal_clipboard:
             copy = item.create_copy()
             copies.append(copy)
         self.undo_stack.push(commands.InsertItems(self, copies, position))
 
-    def raise_to_top(self):
+    def raise_to_top(self) -> None:
         self.cancel_active_modes()
         items = self.selectedItems(user_only=True)
         z_values = map(lambda i: i.zValue(), items)
@@ -119,7 +127,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         for item in items:
             item.setZValue(item.zValue() + delta)
 
-    def lower_to_bottom(self):
+    def lower_to_bottom(self) -> None:
         self.cancel_active_modes()
         items = self.selectedItems(user_only=True)
         z_values = map(lambda i: i.zValue(), items)
@@ -129,7 +137,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         for item in items:
             item.setZValue(item.zValue() + delta)
 
-    def normalize_width_or_height(self, mode):
+    def normalize_width_or_height(self, mode: str) -> None:
         """Scale the selected images to have the same width or height, as
         specified by ``mode``.
 
@@ -153,15 +161,15 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             scale_factors.append(avg / getattr(rect, mode)())
         self.undo_stack.push(commands.NormalizeItems(items, scale_factors))
 
-    def normalize_height(self):
+    def normalize_height(self) -> None:
         """Scale selected images to the same height."""
-        return self.normalize_width_or_height("height")
+        self.normalize_width_or_height("height")
 
-    def normalize_width(self):
+    def normalize_width(self) -> None:
         """Scale selected images to the same width."""
-        return self.normalize_width_or_height("width")
+        self.normalize_width_or_height("width")
 
-    def normalize_size(self):
+    def normalize_size(self) -> None:
         """Scale selected images to the same size.
 
         Size meaning the area = widh * height.
@@ -186,7 +194,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             scale_factors.append(math.sqrt(avg / rect.width() / rect.height()))
         self.undo_stack.push(commands.NormalizeItems(items, scale_factors))
 
-    def arrange_default(self):
+    def arrange_default(self) -> None:
         default = self.settings.valueOrDefault("Items/arrange_default")
         MAPPING = {
             "optimal": self.arrange_optimal,
@@ -197,7 +205,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         MAPPING[default]()
 
-    def arrange(self, vertical=False):
+    def arrange(self, vertical: bool = False) -> None:
         """Arrange items in a line (horizontally or vertically)."""
 
         self.cancel_active_modes()
@@ -237,7 +245,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             commands.ArrangeItems(self, [r["item"] for r in rects], positions)
         )
 
-    def arrange_optimal(self):
+    def arrange_optimal(self) -> None:
         self.cancel_active_modes()
 
         items = self.selectedItems(user_only=True)
@@ -272,7 +280,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         self.undo_stack.push(commands.ArrangeItems(self, items, positions))
 
-    def arrange_square(self):
+    def arrange_square(self) -> None:
         self.cancel_active_modes()
         max_width = 0
         max_height = 0
@@ -310,7 +318,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         self.undo_stack.push(commands.ArrangeItems(self, items, positions))
 
-    def flip_items(self, vertical=False):
+    def flip_items(self, vertical: bool = False) -> None:
         """Flip selected items."""
         self.cancel_active_modes()
         self.undo_stack.push(
@@ -321,14 +329,14 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             )
         )
 
-    def crop_items(self):
+    def crop_items(self) -> None:
         """Crop selected item."""
 
         if self.crop_item:
             return
         if self.has_single_image_selection():
             item = self.selectedItems(user_only=True)[0]
-            if item.is_image:
+            if isinstance(item, BeePixmapItem):
                 item.enter_crop_mode()
 
     def sample_color_at(self, position: QtCore.QPointF) -> QtGui.QColor | None:
@@ -337,40 +345,41 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             return cast(Any, item_at_pos).sample_color_at(position)
         return None
 
-    def select_all_items(self):
+    def select_all_items(self) -> None:
         self.cancel_active_modes()
         path = QtGui.QPainterPath()
         path.addRect(self.itemsBoundingRect())
         # This is faster than looping through all items and calling setSelected
         self.setSelectionArea(path)
 
-    def deselect_all_items(self):
+    def deselect_all_items(self) -> None:
         self.cancel_active_modes()
         self.clearSelection()
 
-    def has_selection(self):
+    def has_selection(self) -> bool:
         """Checks whether there are currently items selected."""
 
         return bool(self.selectedItems(user_only=True))
 
-    def has_single_selection(self):
+    def has_single_selection(self) -> bool:
         """Checks whether there's currently exactly one item selected."""
 
         return len(self.selectedItems(user_only=True)) == 1
 
-    def has_multi_selection(self):
+    def has_multi_selection(self) -> bool:
         """Checks whether there are currently more than one items selected."""
 
         return len(self.selectedItems(user_only=True)) > 1
 
-    def has_single_image_selection(self):
+    def has_single_image_selection(self) -> bool:
         """Checks whether the current selection is a single image."""
 
         if self.has_single_selection():
             return self.selectedItems(user_only=True)[0].is_image
         return False
 
-    def mousePressEvent(self, event):
+    def mousePressEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent | None) -> None:
+        assert event is not None
         if event.button() == Qt.MouseButton.RightButton:
             # Right-click invokes the context menu on the
             # GraphicsView. We don't need it here.
@@ -418,7 +427,8 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             return
         super().mouseDoubleClickEvent(event)
 
-    def mouseMoveEvent(self, event):
+    def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent | None) -> None:
+        assert event is not None
         if self.active_mode == self.RUBBERBAND_MODE:
             if not self.rubberband_item.scene():
                 logger.debug("Activating rubberband selection")
@@ -429,14 +439,17 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             cast("BeeGraphicsView", self.views()[0]).reset_previous_transform()
         super().mouseMoveEvent(event)
 
-    def mouseReleaseEvent(self, event):
+    def mouseReleaseEvent(
+        self, event: QtWidgets.QGraphicsSceneMouseEvent | None
+    ) -> None:
+        assert event is not None
         if self.active_mode == self.RUBBERBAND_MODE:
             self.end_rubberband_mode()
         if (
             self.active_mode == self.MOVE_MODE
             and self.has_selection()
             and self.multi_select_item.active_mode is None
-            and self.selectedItems()[0].active_mode is None
+            and self.selectedItems(user_only=True)[0].active_mode is None
         ):
             delta = event.scenePos() - self.event_start
             if not delta.isNull():
@@ -448,7 +461,17 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         self.active_mode = None
         super().mouseReleaseEvent(event)
 
-    def selectedItems(self, user_only=False):
+    @overload
+    def selectedItems(self, user_only: Literal[True]) -> list[BeeItemMixin]: ...
+
+    @overload
+    def selectedItems(
+        self, user_only: Literal[False] = ...
+    ) -> list[QtWidgets.QGraphicsItem]: ...
+
+    def selectedItems(
+        self, user_only: bool = False
+    ) -> list[BeeItemMixin] | list[QtWidgets.QGraphicsItem]:
         """If ``user_only`` is set to ``True``, only return items added
         by the user (i.e. no multi select outlines and other UI items).
 
@@ -460,10 +483,12 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             return [i for i in items if isinstance(i, BeeItemMixin)]
         return items
 
-    def items_by_type(self, itype):
+    def items_by_type(self, itype: str) -> Iterator[BeeItemMixin]:
         """Returns all items of the given type."""
 
-        return filter(lambda i: getattr(i, "TYPE", None) == itype, self.items())
+        return (
+            i for i in self.items() if isinstance(i, BeeItemMixin) and i.TYPE == itype
+        )
 
     def user_items(self) -> list[BeeItemMixin]:
         """Returns user-created items (excludes internal Qt items)."""
@@ -477,18 +502,22 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         """Snapshot all user items for thread-safe saving."""
         return [item.snapshot() for item in self.user_items()]
 
-    def on_view_scale_change(self):
-        for item in self.selectedItems():
+    def on_view_scale_change(self) -> None:
+        for item in self.selectedItems(user_only=True):
             item.on_view_scale_change()
 
-    def itemsBoundingRect(self, selection_only=False, items=None):
+    def itemsBoundingRect(
+        self,
+        selection_only: bool = False,
+        items: list[Any] | None = None,
+    ) -> QtCore.QRectF:
         """Returns the bounding rect of the scene's items; either all of them
         or only selected ones, or the items givin in ``items``.
 
         Re-implemented to not include the items's selection handles.
         """
 
-        def filter_user_items(ilist):
+        def filter_user_items(ilist: list[Any]) -> list[BeeItemMixin]:
             return [i for i in ilist if isinstance(i, BeeItemMixin)]
 
         if selection_only:
@@ -513,11 +542,11 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
             QtCore.QPointF(min(x), min(y)), QtCore.QPointF(max(x), max(y))
         )
 
-    def get_selection_center(self):
+    def get_selection_center(self) -> QtCore.QPointF:
         rect = self.itemsBoundingRect(selection_only=True)
         return (rect.topLeft() + rect.bottomRight()) / 2
 
-    def on_selection_change(self):
+    def on_selection_change(self) -> None:
         if self._clear_ongoing:
             # Ignore events while clearing the scene since the
             # multiselect item will get cleared, too
@@ -532,7 +561,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
         if not self.has_multi_selection() and self.multi_select_item.scene():
             self.removeItem(self.multi_select_item)
 
-    def on_change(self, region):
+    def on_change(self, region: list[QtCore.QRectF]) -> None:
         if self._clear_ongoing:
             # Ignore events while clearing the scene since the
             # multiselect item will get cleared, too
@@ -545,7 +574,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
                 self.itemsBoundingRect(selection_only=True)
             )
 
-    def add_item_later(self, itemdata, selected=False):
+    def add_item_later(self, itemdata: dict[str, Any], selected: bool = False) -> None:
         """Keep an item for adding later via ``add_queued_items``
 
         :param dict itemdata: Defines the item's data
@@ -554,7 +583,7 @@ class BeeGraphicsScene(QtWidgets.QGraphicsScene):
 
         self.items_to_add.put((itemdata, selected))
 
-    def add_queued_items(self):
+    def add_queued_items(self) -> None:
         """Adds items added via ``add_item_later``"""
 
         while not self.items_to_add.empty():

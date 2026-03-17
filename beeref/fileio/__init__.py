@@ -18,8 +18,9 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from PyQt6 import QtCore
 
@@ -169,16 +170,24 @@ def drain_bee(
         )
 
 
-def load_images(filenames, pos, scene, worker):
+def load_images(
+    filenames: Sequence[str | QtCore.QUrl],
+    pos: QtCore.QPointF,
+    scene: BeeGraphicsScene,
+    worker: ThreadedIO,
+) -> None:
     """Add images to existing scene."""
     from beeref.items import BeePixmapItem
 
     errors = []
     items = []
     worker.begin_processing.emit(len(filenames))
-    for i, filename in enumerate(filenames):
-        logger.info(f"Loading image from file {filename}")
-        img, filename = load_image(filename)
+    for i, raw_filename in enumerate(filenames):
+        logger.info(f"Loading image from file {raw_filename}")
+        load_path: Path | QtCore.QUrl = (
+            Path(raw_filename) if isinstance(raw_filename, str) else raw_filename
+        )
+        img, filename = load_image(load_path)
         worker.progress.emit(i)
         if img.isNull():
             logger.info(f"Could not load file {filename}")
@@ -206,7 +215,7 @@ class ThreadedIO(QtCore.QThread):
     begin_processing = QtCore.pyqtSignal(int)
     user_input_required = QtCore.pyqtSignal(str)
 
-    def __init__(self, func, *args, **kwargs):
+    def __init__(self, func: Callable[..., None], *args: Any, **kwargs: Any) -> None:
         super().__init__()
         self.func = func
         self.args = args
@@ -214,8 +223,8 @@ class ThreadedIO(QtCore.QThread):
         self.kwargs["worker"] = self
         self.canceled = False
 
-    def run(self):
+    def run(self) -> None:
         self.func(*self.args, **self.kwargs)
 
-    def on_canceled(self):
+    def on_canceled(self) -> None:
         self.canceled = True

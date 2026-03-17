@@ -15,12 +15,12 @@
 
 import io
 import logging
-import os.path
 import tempfile
+from pathlib import Path
 from urllib.error import URLError
 from urllib import request
 
-from PyQt6 import QtGui
+from PyQt6 import QtCore, QtGui
 
 from PIL import Image, ImageCms, ImageOps
 
@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 SRGB_PROFILE = ImageCms.createProfile("sRGB")
 
 
-def _pil_to_qimage(pil_img):
+def _pil_to_qimage(pil_img: Image.Image) -> QtGui.QImage:
     """Convert a PIL Image to a QImage."""
     if pil_img.mode == "RGBA":
         fmt = QtGui.QImage.Format.Format_RGBA8888
@@ -46,7 +46,7 @@ def _pil_to_qimage(pil_img):
     return qimg.copy()  # detach from buffer
 
 
-def _ensure_srgb(pil_img):
+def _ensure_srgb(pil_img: Image.Image) -> Image.Image:
     """Convert CMYK or ICC-profiled images to sRGB."""
     icc = pil_img.info.get("icc_profile")
 
@@ -54,7 +54,9 @@ def _ensure_srgb(pil_img):
         if icc:
             src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
             dst = ImageCms.ImageCmsProfile(SRGB_PROFILE)
-            return ImageCms.profileToProfile(pil_img, src, dst, outputMode="RGB")
+            result = ImageCms.profileToProfile(pil_img, src, dst, outputMode="RGB")
+            assert result is not None
+            return result
         else:
             logger.warning("CMYK image with no ICC profile, using naive conversion")
             return pil_img.convert("RGB")
@@ -63,14 +65,18 @@ def _ensure_srgb(pil_img):
         try:
             src = ImageCms.ImageCmsProfile(io.BytesIO(icc))
             dst = ImageCms.ImageCmsProfile(SRGB_PROFILE)
-            return ImageCms.profileToProfile(pil_img, src, dst, outputMode=pil_img.mode)
+            result = ImageCms.profileToProfile(
+                pil_img, src, dst, outputMode=pil_img.mode
+            )
+            assert result is not None
+            return result
         except ImageCms.PyCMSError:
             logger.debug("ICC profile conversion failed, using image as-is")
 
     return pil_img
 
 
-def load_pil_image(path):
+def load_pil_image(path: Path) -> QtGui.QImage:
     """Load image via Pillow with EXIF rotation and color management.
     Returns a QImage (null if loading fails)."""
     try:
@@ -83,15 +89,14 @@ def load_pil_image(path):
         return QtGui.QImage()
 
 
-def load_image(path):
-    if isinstance(path, str):
-        path = os.path.normpath(path)
-        return (load_pil_image(path), path)
+def load_image(path: Path | QtCore.QUrl) -> tuple[QtGui.QImage, str]:
+    if isinstance(path, Path):
+        return (load_pil_image(path), str(path))
     if path.isLocalFile():
-        path = os.path.normpath(path.toLocalFile())
-        return (load_pil_image(path), path)
+        local = Path(path.toLocalFile())
+        return (load_pil_image(local), str(local))
 
-    url = bytes(path.toEncoded()).decode()
+    url = path.toEncoded().data().decode()
     img = QtGui.QImage()
     try:
         imgdata = request.urlopen(url).read()
@@ -99,9 +104,8 @@ def load_image(path):
         logger.debug(f"Downloading image failed: {e.reason}")
     else:
         with tempfile.TemporaryDirectory() as tmp:
-            fname = os.path.join(tmp, "img")
-            with open(fname, "wb") as f:
-                f.write(imgdata)
-                logger.debug(f"Temporarily saved in: {fname}")
-            img = load_pil_image(fname)
+            tmp_file = Path(tmp) / "img"
+            tmp_file.write_bytes(imgdata)
+            logger.debug(f"Temporarily saved in: {tmp_file}")
+            img = load_pil_image(tmp_file)
     return (img, url)

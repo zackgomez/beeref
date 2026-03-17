@@ -108,6 +108,14 @@ class BeeItemMixin(SelectableMixin):
         """Return type-specific data for JSON serialization. Override in subclasses."""
         return {}
 
+    def create_copy(self) -> BeeItemMixin:
+        """Create a copy of this item. Override in subclasses."""
+        raise NotImplementedError
+
+    def copy_to_clipboard(self, clipboard: QtGui.QClipboard) -> None:
+        """Copy this item to the system clipboard. Override in subclasses."""
+        raise NotImplementedError
+
     @classmethod
     def from_snapshot(cls, snap: ItemSnapshot) -> BeeItemMixin:
         """Create an item from a snapshot. Override in subclasses."""

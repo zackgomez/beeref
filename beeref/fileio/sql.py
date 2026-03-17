@@ -30,14 +30,18 @@ import os
 import shutil
 import sqlite3
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from beeref import constants
 from beeref.logging import getLogger
 from .errors import BeeFileIOError
 from .schema import SCHEMA, USER_VERSION, MIGRATIONS, APPLICATION_ID
 from .snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
+
+if TYPE_CHECKING:
+    from beeref.fileio import ThreadedIO
 
 
 logger = getLogger(__name__)
@@ -49,8 +53,8 @@ def is_bee_file(path: Path) -> bool:
     return path.suffix == ".bee"
 
 
-def handle_sqlite_errors(func):
-    def wrapper(self, *args, **kwargs):
+def handle_sqlite_errors[T: Callable[..., Any]](func: T) -> T:
+    def wrapper(self: SQLiteIO, *args: Any, **kwargs: Any) -> Any:
         try:
             return func(self, *args, **kwargs)
         except Exception as e:
@@ -64,7 +68,9 @@ def handle_sqlite_errors(func):
             self._close_connection()
             raise BeeFileIOError(msg=str(e), filename=self.filename) from e
 
-    return wrapper
+    # wrapper has a different signature than func (added error handling),
+    # but we preserve the decorated function's identity for callers.
+    return wrapper  # type: ignore[return-value]
 
 
 class SQLiteIO:
@@ -73,18 +79,18 @@ class SQLiteIO:
         filename: Path,
         create_new: bool = False,
         readonly: bool = False,
-        worker: Any = None,
-    ):
+        worker: ThreadedIO | None = None,
+    ) -> None:
         self.create_new = create_new
         self.filename: Path = filename
         self.readonly = readonly
         self.worker = worker
         self.retry = False
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._close_connection()
 
-    def _close_connection(self):
+    def _close_connection(self) -> None:
         if hasattr(self, "_connection"):
             self._connection.close()
             delattr(self, "_connection")
@@ -94,7 +100,7 @@ class SQLiteIO:
             self._tmpdir.cleanup()
             delattr(self, "_tmpdir")
 
-    def _establish_connection(self):
+    def _establish_connection(self) -> None:
         if self.create_new and not self.readonly and os.path.exists(self.filename):
             os.remove(self.filename)
 
@@ -112,7 +118,7 @@ class SQLiteIO:
                 self.create_new = True
                 self._establish_connection()
 
-    def _migrate(self):
+    def _migrate(self) -> None:
         """Migrate database if necessary."""
 
         version = self.fetchone("PRAGMA user_version")[0]
@@ -144,37 +150,37 @@ class SQLiteIO:
         logger.debug("Migration finished")
 
     @property
-    def connection(self):
+    def connection(self) -> sqlite3.Connection:
         if not hasattr(self, "_connection"):
             self._establish_connection()
         return self._connection
 
     @property
-    def cursor(self):
+    def cursor(self) -> sqlite3.Cursor:
         if not hasattr(self, "_cursor"):
             self._establish_connection()
         return self._cursor
 
-    def ex(self, *args, **kwargs):
+    def ex(self, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
         return self.cursor.execute(*args, **kwargs)
 
-    def exmany(self, *args, **kwargs):
+    def exmany(self, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
         return self.cursor.executemany(*args, **kwargs)
 
-    def fetchone(self, *args, **kwargs):
+    def fetchone(self, *args: Any, **kwargs: Any) -> Any:
         self.ex(*args, **kwargs)
         return self.cursor.fetchone()
 
-    def fetchall(self, *args, **kwargs):
+    def fetchall(self, *args: Any, **kwargs: Any) -> list[Any]:
         self.ex(*args, **kwargs)
         return self.cursor.fetchall()
 
-    def write_meta(self):
+    def write_meta(self) -> None:
         self.ex("PRAGMA application_id=%s" % APPLICATION_ID)
         self.ex("PRAGMA user_version=%s" % USER_VERSION)
         self.ex("PRAGMA foreign_keys=ON")
 
-    def create_schema_on_new(self):
+    def create_schema_on_new(self) -> None:
         if self.create_new:
             self.write_meta()
             for schema in SCHEMA:
@@ -272,7 +278,9 @@ class SQLiteIO:
                 self._close_connection()
                 return self.write(snapshots, compact=compact)
 
-    def write_data(self, snapshots: list, compact: bool = False):
+    def write_data(
+        self, snapshots: list[ItemSnapshot], compact: bool = False
+    ) -> list[str]:
         existing_ids = {row[0] for row in self.fetchall("SELECT id from ITEMS")}
         to_delete = set(existing_ids)
 
@@ -300,16 +308,14 @@ class SQLiteIO:
         self.connection.commit()
         return newly_saved
 
-    def delete_items(self, to_delete):
-        to_delete = [(pk,) for pk in to_delete]
-        self.exmany("DELETE FROM items WHERE id=?", to_delete)
-        self.exmany("DELETE FROM sqlar WHERE item_id=?", to_delete)
+    def delete_items(self, to_delete: set[str]) -> None:
+        items = [(pk,) for pk in to_delete]
+        self.exmany("DELETE FROM items WHERE id=?", items)
+        self.exmany("DELETE FROM sqlar WHERE item_id=?", items)
         self.connection.commit()
 
-    def _insert_snapshot(self, snap):
+    def _insert_snapshot(self, snap: ItemSnapshot) -> None:
         """Insert a new item from a snapshot."""
-        from beeref.items import PixmapItemSnapshot
-
         width = snap.width if isinstance(snap, PixmapItemSnapshot) else None
         height = snap.height if isinstance(snap, PixmapItemSnapshot) else None
         self.ex(
@@ -346,7 +352,7 @@ class SQLiteIO:
             )
         self.connection.commit()
 
-    def _update_snapshot(self, snap):
+    def _update_snapshot(self, snap: ItemSnapshot) -> None:
         """Update an existing item's metadata from a snapshot."""
         self.ex(
             "UPDATE items SET x=?, y=?, z=?, scale=?, rotation=?, flip=?, "

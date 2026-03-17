@@ -19,6 +19,7 @@ from functools import partial
 import os
 import os.path
 from pathlib import Path
+from collections.abc import Sequence
 from typing import Any, Callable, cast
 
 from beeref.logging import getLogger
@@ -702,7 +703,9 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
             self.on_action_fit_scene()
 
     def do_insert_images(
-        self, filenames: list[Any] | Any, pos: QtCore.QPoint | None = None
+        self,
+        filenames: Sequence[str | QtCore.QUrl],
+        pos: QtCore.QPoint | None = None,
     ) -> None:
         if pos is None:
             pos = self.get_view_center()
