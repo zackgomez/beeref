@@ -247,8 +247,6 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         self.undo_stack.clear()
         self.filename = None
         self.setTransform(QtGui.QTransform())
-        # Create fresh .swp for the new empty scene
-        self.scene._scratch_file = fileio.create_scratch_file(None)
 
     def reset_previous_transform(self, toggle_item: Any = None) -> None:
         if (
@@ -301,6 +299,7 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         )
         if confirm:
             self.clear_scene()
+            self.scene._scratch_file = fileio.create_scratch_file(None)
 
     def on_action_fit_scene(self) -> None:
         self.fit_rect(self.scene.itemsBoundingRect())

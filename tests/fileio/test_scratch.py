@@ -137,11 +137,10 @@ def test_close_event_deletes_scratch_file(main_window, settings):
 
 
 def test_clear_scene_deletes_scratch_file(view, settings):
-    """Clearing the scene should delete the old scratch file and create a new one."""
+    """Clearing the scene should delete the scratch file without creating a new one."""
     swp = create_scratch_file(None)
     view.scene._scratch_file = swp
     assert os.path.exists(swp)
     view.clear_scene()
     assert not os.path.exists(swp)
-    assert view.scene._scratch_file is not None
-    assert view.scene._scratch_file != swp
+    assert view.scene._scratch_file is None
