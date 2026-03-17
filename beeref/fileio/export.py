@@ -30,7 +30,7 @@ from beeref.items import BeePixmapItem, BeeTextItem
 from beeref.logging import getLogger
 
 if TYPE_CHECKING:
-    from beeref.fileio import ThreadedIO
+    from beeref.fileio.thread import ThreadedIO
     from beeref.scene import BeeGraphicsScene
 
 

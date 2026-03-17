@@ -41,7 +41,7 @@ from .schema import SCHEMA, USER_VERSION, MIGRATIONS, APPLICATION_ID
 from .snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
 
 if TYPE_CHECKING:
-    from beeref.fileio import ThreadedIO
+    from beeref.fileio.thread import ThreadedIO
 
 
 logger = getLogger(__name__)

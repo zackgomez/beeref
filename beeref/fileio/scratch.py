@@ -28,7 +28,7 @@ from beeref.config import BeeSettings
 from beeref.fileio.schema import APPLICATION_ID, SCHEMA, USER_VERSION
 
 if TYPE_CHECKING:
-    from beeref.fileio import ThreadedIO
+    from beeref.fileio.thread import ThreadedIO
 
 logger = logging.getLogger(__name__)
 
