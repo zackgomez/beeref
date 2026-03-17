@@ -20,7 +20,7 @@ from typing import Any
 
 from PyQt6 import QtCore
 
-from beeref.fileio.snapshot import IOResult
+from beeref.types.snapshot import IOResult
 
 
 class ThreadedIO(QtCore.QThread):

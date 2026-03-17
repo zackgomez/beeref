@@ -24,7 +24,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 from beeref.config import BeeSettings
 from .errors import BeeFileIOError
-from .snapshot import IOResult
+from beeref.types.snapshot import IOResult
 from beeref import widgets
 from beeref.items import BeePixmapItem, BeeTextItem
 from beeref.logging import getLogger

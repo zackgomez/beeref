@@ -6,7 +6,7 @@ from PyQt6 import QtCore, QtGui
 
 from beeref import fileio
 from beeref import commands
-from beeref.fileio.snapshot import IOResult
+from beeref.types.snapshot import IOResult
 from beeref.items import BeePixmapItem
 from ..utils import queue2list
 

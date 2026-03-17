@@ -10,7 +10,7 @@ from beeref import constants
 from beeref.items import BeePixmapItem
 from beeref.fileio.errors import BeeFileIOError
 from beeref.fileio.export import SceneToPixmapExporter
-from beeref.fileio.snapshot import IOResult
+from beeref.types.snapshot import IOResult
 
 
 @patch("beeref.widgets.SceneToPixmapExporterDialog.exec", return_value=True)

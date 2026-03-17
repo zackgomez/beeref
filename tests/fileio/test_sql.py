@@ -9,7 +9,7 @@ import pytest
 
 from beeref.fileio import schema, is_bee_file
 from beeref.fileio.errors import BeeFileIOError
-from beeref.fileio.snapshot import ItemSnapshot, PixmapItemSnapshot
+from beeref.types.snapshot import ItemSnapshot, PixmapItemSnapshot
 from beeref.fileio.sql import SQLiteIO
 from beeref.items import (
     BeePixmapItem,

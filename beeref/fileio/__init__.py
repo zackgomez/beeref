@@ -21,7 +21,7 @@ from beeref.fileio.scratch import (
     derive_swp_path,
     list_recovery_files,
 )
-from beeref.fileio.snapshot import IOResult, LoadResult, SaveResult
+from beeref.types.snapshot import IOResult, LoadResult, SaveResult
 from beeref.fileio.sql import is_bee_file
 from beeref.fileio.thread import ThreadedIO
 

@@ -36,7 +36,7 @@ from PyQt6.QtCore import Qt
 from beeref import commands
 from beeref.config import BeeSettings
 from beeref.constants import COLORS
-from beeref.fileio.snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
+from beeref.types.snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
 from beeref.selection import SelectableMixin
 
 logger = logging.getLogger(__name__)

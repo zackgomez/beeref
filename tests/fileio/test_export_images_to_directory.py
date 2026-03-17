@@ -8,7 +8,7 @@ from PyQt6 import QtGui
 from beeref.items import BeePixmapItem
 from beeref.fileio.errors import BeeFileIOError
 from beeref.fileio.export import ImagesToDirectoryExporter
-from beeref.fileio.snapshot import IOResult
+from beeref.types.snapshot import IOResult
 
 
 def _export_filename(item):

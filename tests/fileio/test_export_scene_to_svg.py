@@ -9,7 +9,7 @@ from PyQt6 import QtGui, QtCore
 from beeref.items import BeePixmapItem, BeeTextItem
 from beeref.fileio.errors import BeeFileIOError
 from beeref.fileio.export import SceneToSVGExporter
-from beeref.fileio.snapshot import IOResult
+from beeref.types.snapshot import IOResult
 
 
 def test_scene_to_svg_exporter_get_user_input(view):

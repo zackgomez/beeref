@@ -38,7 +38,7 @@ from beeref import constants
 from beeref.logging import getLogger
 from .errors import BeeFileIOError
 from .schema import SCHEMA, USER_VERSION, MIGRATIONS, APPLICATION_ID
-from .snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
+from beeref.types.snapshot import ErrorItemSnapshot, ItemSnapshot, PixmapItemSnapshot
 
 if TYPE_CHECKING:
     from beeref.fileio.thread import ThreadedIO

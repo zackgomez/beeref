@@ -30,7 +30,7 @@ from beeref import commands
 from beeref.fileio.errors import BeeFileIOError
 from beeref.fileio.image import load_image
 from beeref.fileio.scratch import copy_with_progress, create_scratch_file
-from beeref.fileio.snapshot import IOResult, ItemSnapshot, LoadResult, SaveResult
+from beeref.types.snapshot import IOResult, ItemSnapshot, LoadResult, SaveResult
 from beeref.fileio.sql import SQLiteIO
 from beeref.fileio.thread import ThreadedIO
 from beeref.items import BeePixmapItem

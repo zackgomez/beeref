@@ -29,7 +29,7 @@ import rpack
 
 from beeref import commands
 from beeref.config import BeeSettings
-from beeref.fileio.snapshot import ItemSnapshot
+from beeref.types.snapshot import ItemSnapshot
 from beeref.items import (
     BeeItemMixin,
     BeePixmapItem,
