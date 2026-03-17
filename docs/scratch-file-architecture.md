@@ -99,9 +99,9 @@ sqlar: name TEXT PK, item_id TEXT UNIQUE FK, mode, mtime, sz, data BLOB
 | `save_bee(filename, snapshots, ...)` | `fileio/__init__.py` | Emits `SaveResult` |
 | `load_bee(filename, scene, ...)` | `fileio/__init__.py` | Emits `LoadResult` |
 
-## Remaining work (this is the next task)
+## Remaining work
 
-All the snapshot/IO infrastructure is built. The remaining work is completing the scratch file lifecycle: drain, save-through-swp, crash recovery.
+Crash recovery UI is the main remaining piece. Drain, save-through-swp, and cleanup are implemented.
 
 ### Design principle: .swp never deletes, .bee is compacted
 
