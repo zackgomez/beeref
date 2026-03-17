@@ -24,6 +24,7 @@ from PyQt6 import QtCore, QtGui
 
 from PIL import Image, ImageCms, ImageOps
 
+Image.MAX_IMAGE_PIXELS = None  # Qt's allocation limit handles this
 
 logger = logging.getLogger(__name__)
 
