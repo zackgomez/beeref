@@ -460,11 +460,11 @@ def test_sqliteio_write_removes_nonexisting_text_item(tmpfile, view):
     item.setPos(44, 55)
     view.scene.addItem(item)
     io = SQLiteIO(tmpfile, create_new=True)
-    io.write(view.scene.snapshot_for_save())
+    io.write(view.scene.snapshot_for_save(), compact=True)
 
     view.scene.removeItem(item)
     io.create_new = False
-    io.write(view.scene.snapshot_for_save())
+    io.write(view.scene.snapshot_for_save(), compact=True)
 
     assert io.fetchone("SELECT COUNT(*) from items") == (0,)
     assert io.fetchone("SELECT COUNT(*) from sqlar") == (0,)
@@ -476,7 +476,7 @@ def test_sqliteio_write_removes_nonexisting_pixmap_item(tmpfile, view, imgfilena
     item.setPos(44, 55)
     view.scene.addItem(item)
     io = SQLiteIO(tmpfile, create_new=True)
-    io.write(view.scene.snapshot_for_save())
+    io.write(view.scene.snapshot_for_save(), compact=True)
     assert io.fetchone("SELECT COUNT(*) from items") == (1,)
     assert io.fetchone("SELECT COUNT(*) from sqlar") == (1,)
 
@@ -484,7 +484,7 @@ def test_sqliteio_write_removes_nonexisting_pixmap_item(tmpfile, view, imgfilena
 
     io = SQLiteIO(tmpfile, create_new=False)
     io.create_new = False
-    io.write(view.scene.snapshot_for_save())
+    io.write(view.scene.snapshot_for_save(), compact=True)
 
     assert io.fetchone("SELECT COUNT(*) from items") == (0,)
     assert io.fetchone("SELECT COUNT(*) from sqlar") == (0,)

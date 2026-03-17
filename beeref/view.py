@@ -82,8 +82,11 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         self.undo_stack.canRedoChanged.connect(self.on_can_redo_changed)
         self.undo_stack.canUndoChanged.connect(self.on_can_undo_changed)
         self.undo_stack.cleanChanged.connect(self.on_undo_clean_changed)
+        self.undo_stack.indexChanged.connect(self.on_undo_index_changed)
 
         self.filename = None
+        self.worker: fileio.ThreadedIO | None = None
+        self._drain_dirty = False
         self.previous_transform: dict[str, Any] | None = None
         self.active_mode: int | None = None
 
@@ -98,6 +101,15 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         self.build_menu_and_actions()
         self.control_target = self
         self.init_main_controls(main_window=parent)
+
+        # Create empty .swp for untitled scene
+        self.scene._scratch_file = fileio.create_scratch_file(None)
+
+        # Drain timer — periodically write scene state to .swp
+        self.drain_timer = QtCore.QTimer(self)
+        self.drain_timer.setInterval(60_000)
+        self.drain_timer.timeout.connect(self.drain_tick)
+        self.drain_timer.start()
 
         # Load files given via command line
         if commandline_args.filenames:
@@ -175,6 +187,37 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
     def on_undo_clean_changed(self, clean: bool) -> None:
         self.update_window_title()
 
+    def on_undo_index_changed(self, index: int) -> None:
+        self._drain_dirty = True
+
+    def drain_tick(self) -> None:
+        """Periodic drain: write scene state to the .swp file."""
+        if not self._drain_dirty:
+            return
+        if not self.scene._scratch_file:
+            return
+        if self.worker is not None and self.worker.isRunning():
+            return
+        self._drain_dirty = False
+        snapshots = self.scene.snapshot_for_save()
+        self.worker = fileio.ThreadedIO(
+            fileio.drain_bee,
+            self.scene._scratch_file,
+            snapshots,
+        )
+        self.worker.finished.connect(self.on_drain_finished)
+        self.worker.start()
+
+    def on_drain_finished(self, result: fileio.IOResult) -> None:
+        """Handle drain completion — mark newly-saved blobs."""
+        if result.errors:
+            logger.warning("Drain failed: %s", result.errors)
+            return
+        assert isinstance(result, fileio.SaveResult)
+        for item in self.scene.user_items():
+            if isinstance(item, BeePixmapItem) and item.save_id in result.newly_saved:
+                item._blob_saved = True
+
     def on_context_menu(self, point: QtCore.QPoint) -> None:
         global_point = self.mapToGlobal(point)
         exec_menu = cast(Any, self.context_menu.exec)
@@ -196,6 +239,7 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
     def clear_scene(self) -> None:
         logger.debug("Clearing scene...")
         self.cancel_active_modes()
+        self._drain_dirty = False
         if self.scene._scratch_file:
             fileio.delete_scratch_file(self.scene._scratch_file)
             self.scene._scratch_file = None
@@ -203,6 +247,8 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         self.undo_stack.clear()
         self.filename = None
         self.setTransform(QtGui.QTransform())
+        # Create fresh .swp for the new empty scene
+        self.scene._scratch_file = fileio.create_scratch_file(None)
 
     def reset_previous_transform(self, toggle_item: Any = None) -> None:
         if (
@@ -586,6 +632,7 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
         if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             self.exporter.handle_existing = dlg.get_answer()
             directory = self.exporter.dirname
+            assert self.worker is not None
             self.progress = widgets.BeeProgressDialog(
                 f"Exporting to {directory}", worker=self.worker, parent=self
             )

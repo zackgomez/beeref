@@ -40,6 +40,7 @@ __all__ = [
     "is_bee_file",
     "load_bee",
     "save_bee",
+    "drain_bee",
     "load_images",
     "ThreadedIO",
     "BeeFileIOError",
@@ -90,13 +91,38 @@ def save_bee(
     logger.debug(f"Create new: {create_new}")
     try:
         io = SQLiteIO(filename, create_new=create_new, worker=worker)
-        newly_saved = io.write(snapshots)
+        newly_saved = io.write(snapshots, compact=True)
     except BeeFileIOError as e:
         logger.exception(f"Failed to save {filename}")
         if worker:
             worker.finished.emit(SaveResult(filename=filename, errors=[str(e)]))
         return
     logger.info("End save")
+    if worker:
+        worker.finished.emit(
+            SaveResult(
+                filename=filename,
+                newly_saved=newly_saved or [],
+            )
+        )
+
+
+def drain_bee(
+    filename: str,
+    snapshots: list[ItemSnapshot],
+    worker: ThreadedIO | None = None,
+) -> None:
+    """Drain scene state to the scratch file (no deletes, no VACUUM)."""
+    logger.info(f"Draining to scratch file {filename}...")
+    try:
+        io = SQLiteIO(filename, worker=worker)
+        newly_saved = io.write(snapshots, compact=False)
+    except BeeFileIOError as e:
+        logger.exception(f"Failed to drain {filename}")
+        if worker:
+            worker.finished.emit(SaveResult(filename=filename, errors=[str(e)]))
+        return
+    logger.info("End drain")
     if worker:
         worker.finished.emit(
             SaveResult(

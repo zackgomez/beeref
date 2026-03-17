@@ -256,12 +256,12 @@ class SQLiteIO:
         return snapshots
 
     @handle_sqlite_errors
-    def write(self, snapshots: list[ItemSnapshot]) -> list[str]:
+    def write(self, snapshots: list[ItemSnapshot], compact: bool = False) -> list[str]:
         if self.readonly:
             raise sqlite3.OperationalError("Attempt to write to a readonly database")
         try:
             self.create_schema_on_new()
-            return self.write_data(snapshots)
+            return self.write_data(snapshots, compact=compact)
         except Exception:
             if self.retry:
                 raise
@@ -270,9 +270,9 @@ class SQLiteIO:
                 logger.exception(f"Updating to existing file {self.filename} failed")
                 self.create_new = True
                 self._close_connection()
-                return self.write(snapshots)
+                return self.write(snapshots, compact=compact)
 
-    def write_data(self, snapshots: list):
+    def write_data(self, snapshots: list, compact: bool = False):
         existing_ids = {row[0] for row in self.fetchall("SELECT id from ITEMS")}
         to_delete = set(existing_ids)
 
@@ -294,8 +294,9 @@ class SQLiteIO:
                 self.worker.progress.emit(i)
                 if self.worker.canceled:
                     break
-        self.delete_items(to_delete)
-        self.ex("VACUUM")
+        if compact:
+            self.delete_items(to_delete)
+            self.ex("VACUUM")
         self.connection.commit()
         return newly_saved
 
