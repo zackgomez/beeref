@@ -102,6 +102,13 @@ def tmpfile(tmp_path):
 
 
 @pytest.fixture
+def scene(qapp):
+    from beeref.scene import BeeGraphicsScene
+
+    yield BeeGraphicsScene(QtGui.QUndoStack())
+
+
+@pytest.fixture
 def item():
     from beeref.items import BeePixmapItem
 
