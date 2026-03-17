@@ -6,35 +6,35 @@ from beeref import commands
 from beeref.items import BeePixmapItem, BeeTextItem
 
 
-def test_insert_items(view):
-    view.scene.update_selection = MagicMock()
-    view.scene.max_z = 5
+def test_insert_items(scene):
+    scene.update_selection = MagicMock()
+    scene.max_z = 5
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setPos(50, 40)
-    command = commands.InsertItems(view.scene, [item2])
+    command = commands.InsertItems(scene, [item2])
     command.redo()
-    assert list(view.scene.user_items()) == [item1, item2]
+    assert list(scene.user_items()) == [item1, item2]
     assert item1.isSelected() is False
     assert item2.isSelected() is True
     assert item2.pos() == QtCore.QPointF(50, 40)
     item2.zValue() > 5
     command.undo()
-    assert list(view.scene.user_items()) == [item1]
+    assert list(scene.user_items()) == [item1]
     assert item1.isSelected() is False
     assert item2.pos() == QtCore.QPointF(50, 40)
 
 
-def test_insert_items_with_position(view):
-    view.scene.update_selection = MagicMock()
+def test_insert_items_with_position(scene):
+    scene.update_selection = MagicMock()
 
     item1 = BeePixmapItem(QtGui.QImage())
     item1.setPos(10, 20)
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setPos(50, 40)
-    view.scene.addItem(item2)
+    scene.addItem(item2)
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
@@ -43,47 +43,47 @@ def test_insert_items_with_position(view):
             item2, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
         ):
             command = commands.InsertItems(
-                view.scene, [item1, item2], QtCore.QPointF(100, 200)
+                scene, [item1, item2], QtCore.QPointF(100, 200)
             )
             command.redo()
-            assert set(view.scene.user_items()) == {item1, item2}
+            assert set(scene.user_items()) == {item1, item2}
             assert item1.pos() == QtCore.QPointF(30, 150)
             assert item2.pos() == QtCore.QPointF(70, 170)
             command.undo()
-            assert list(view.scene.user_items()) == []
+            assert list(scene.user_items()) == []
             assert item1.pos() == QtCore.QPointF(10, 20)
             assert item2.pos() == QtCore.QPointF(50, 40)
 
 
-def test_insert_items_ignore_first_redo(view):
-    view.scene.update_selection = MagicMock()
-    view.scene.max_z = 5
+def test_insert_items_ignore_first_redo(scene):
+    scene.update_selection = MagicMock()
+    scene.max_z = 5
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
-    command = commands.InsertItems(view.scene, [item2], ignore_first_redo=True)
+    command = commands.InsertItems(scene, [item2], ignore_first_redo=True)
     command.redo()
-    assert list(view.scene.user_items()) == [item1]
+    assert list(scene.user_items()) == [item1]
     assert item1.isSelected() is False
     command.redo()
-    assert list(view.scene.user_items()) == [item1, item2]
+    assert list(scene.user_items()) == [item1, item2]
     assert item1.isSelected() is False
     assert item2.isSelected() is True
     item2.zValue() > 5
 
 
-def test_delete_items(view):
-    view.scene.update_selection = MagicMock()
+def test_delete_items(scene):
+    scene.update_selection = MagicMock()
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    command = commands.DeleteItems(view.scene, [item2])
+    command = commands.DeleteItems(scene, [item2])
     command.redo()
-    assert list(view.scene.user_items()) == [item1]
+    assert list(scene.user_items()) == [item1]
     command.undo()
-    assert list(view.scene.user_items()) == [item1, item2]
+    assert list(scene.user_items()) == [item1, item2]
     assert item1.isSelected() is False
     assert item2.isSelected() is True
 
@@ -441,15 +441,15 @@ def test_reset_transforms(qapp):
             assert item3.crop == QtCore.QRectF(10, 20, 30, 40)
 
 
-def test_arrange_items(view):
+def test_arrange_items(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.do_flip()
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setRotation(90)
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
     ):
@@ -462,7 +462,7 @@ def test_arrange_items(view):
                 return_value=QtCore.QRectF(5, 5, 20, 30),
             ):
                 command = commands.ArrangeItems(
-                    view.scene,
+                    scene,
                     [item1, item2, item3],
                     [
                         QtCore.QPointF(1, 2),
@@ -501,10 +501,10 @@ def test_change_text():
     assert item._markdown == "foo"
 
 
-def test_change_opacity(view):
+def test_change_opacity(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.setOpacity(0.5)
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setOpacity(1)
     command = commands.ChangeOpacity([item1, item2], 0.7)
@@ -516,10 +516,10 @@ def test_change_opacity(view):
     assert item2.opacity() == 1
 
 
-def test_change_opacity_ignore_first_redo(view):
+def test_change_opacity_ignore_first_redo(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.setOpacity(0.5)
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setOpacity(1)
     command = commands.ChangeOpacity([item1, item2], 0.7, ignore_first_redo=True)

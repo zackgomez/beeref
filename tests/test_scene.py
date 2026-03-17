@@ -11,106 +11,106 @@ from beeref import commands
 from beeref.items import BeePixmapItem, BeeTextItem
 
 
-def test_add_remove_item(view, item):
-    view.scene.addItem(item)
-    assert view.scene.items() == [item]
-    view.scene.removeItem(item)
-    assert view.scene.items() == []
+def test_add_remove_item(scene, item):
+    scene.addItem(item)
+    assert scene.items() == [item]
+    scene.removeItem(item)
+    assert scene.items() == []
 
 
-def test_cancel_crop_mode_when_crop(view, item):
-    view.scene.crop_item = item
+def test_cancel_crop_mode_when_crop(scene, item):
+    scene.crop_item = item
     item.exit_crop_mode = MagicMock()
-    view.scene.cancel_crop_mode()
+    scene.cancel_crop_mode()
     item.exit_crop_mode.assert_called_once_with(confirm=False)
 
 
-def test_cancel_crop_mode_when_no_crop(view, item):
-    view.scene.cancel_crop_mode()
+def test_cancel_crop_mode_when_no_crop(scene, item):
+    scene.cancel_crop_mode()
 
 
-def test_copy_selection_to_internal_clipboard(view):
+def test_copy_selection_to_internal_clipboard(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
 
-    view.scene.copy_selection_to_internal_clipboard()
-    assert set(view.scene.internal_clipboard) == {item1, item2}
-    assert set(view.scene.user_items()) == {item1, item2, item3}
+    scene.copy_selection_to_internal_clipboard()
+    assert set(scene.internal_clipboard) == {item1, item2}
+    assert set(scene.user_items()) == {item1, item2, item3}
 
 
-def test_paste_from_internal_clipboard(view):
+def test_paste_from_internal_clipboard(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setScale(3.3)
-    view.scene.internal_clipboard = [item2]
+    scene.internal_clipboard = [item2]
 
-    view.scene.paste_from_internal_clipboard(None)
-    assert len(list(view.scene.user_items())) == 2
+    scene.paste_from_internal_clipboard(None)
+    assert len(list(scene.user_items())) == 2
     assert item1.isSelected() is False
-    new_item = view.scene.selectedItems(user_only=True)[0]
+    new_item = scene.selectedItems(user_only=True)[0]
     assert new_item.scale() == 3.3
     assert new_item is not item2
 
 
-def test_raise_to_top(view):
+def test_raise_to_top(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setZValue(0.06)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setZValue(0.02)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setZValue(0.07)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
-    view.scene.raise_to_top()
-    assert item1.zValue() == 0.11 + view.scene.Z_STEP
-    assert item2.zValue() == 0.07 + view.scene.Z_STEP
+    scene.raise_to_top()
+    assert item1.zValue() == 0.11 + scene.Z_STEP
+    assert item2.zValue() == 0.07 + scene.Z_STEP
     assert item3.zValue() == 0.07
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_lower_to_bottom(view):
+def test_lower_to_bottom(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setZValue(-0.06)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setZValue(-0.02)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setZValue(-0.07)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
-    view.scene.lower_to_bottom()
-    assert item1.zValue() == -0.11 - view.scene.Z_STEP
-    assert item2.zValue() == -0.07 - view.scene.Z_STEP
+    scene.lower_to_bottom()
+    assert item1.zValue() == -0.11 - scene.Z_STEP
+    assert item2.zValue() == -0.07 - scene.Z_STEP
     assert item3.zValue() == -0.07
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_height(view):
+def test_normalize_height(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setScale(3)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
@@ -118,24 +118,24 @@ def test_normalize_height(view):
         with patch.object(
             item2, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
         ):
-            view.scene.normalize_height()
+            scene.normalize_height()
 
     assert item1.scale() == 2
     assert item1.pos() == QtCore.QPointF(-50, -40)
     assert item2.scale() == 2
     assert item2.pos() == QtCore.QPointF(50, 40)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_height_with_rotation(view):
+def test_normalize_height_with_rotation(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setRotation(90)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 200)
@@ -145,28 +145,28 @@ def test_normalize_height_with_rotation(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 100, 200),
         ):
-            view.scene.normalize_height()
+            scene.normalize_height()
 
     assert item1.scale() == 0.75
     assert item2.scale() == 1.5
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_height_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.normalize_height()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_normalize_height_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.normalize_height()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_width(view):
+def test_normalize_width(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setScale(3)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 80, 100)
@@ -174,24 +174,24 @@ def test_normalize_width(view):
         with patch.object(
             item2, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 80, 100)
         ):
-            view.scene.normalize_width()
+            scene.normalize_width()
 
     assert item1.scale() == 2
     assert item1.pos() == QtCore.QPointF(-40, -50)
     assert item2.scale() == 2
     assert item2.pos() == QtCore.QPointF(40, 50)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_width_with_rotation(view):
+def test_normalize_width_with_rotation(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setRotation(90)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 200, 100)
@@ -201,28 +201,28 @@ def test_normalize_width_with_rotation(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 200, 100),
         ):
-            view.scene.normalize_height()
+            scene.normalize_height()
 
     assert item1.scale() == 1.5
     assert item2.scale() == 0.75
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_width_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.normalize_width()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_normalize_width_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.normalize_width()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_size(view):
+def test_normalize_size(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setScale(2)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 100)
@@ -232,22 +232,22 @@ def test_normalize_size(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 100, 100),
         ):
-            view.scene.normalize_size()
+            scene.normalize_size()
 
     assert item1.scale() == approx(math.sqrt(2.5))
     assert item2.scale() == approx(math.sqrt(2.5))
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_size_with_rotation(view):
+def test_normalize_size_with_rotation(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setRotation(90)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 200)
@@ -257,17 +257,17 @@ def test_normalize_size_with_rotation(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 100, 200),
         ):
-            view.scene.normalize_size()
+            scene.normalize_size()
 
     assert item1.scale() == 1
     assert item2.scale() == 1
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_normalize_size_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.normalize_size()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_normalize_size_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.normalize_size()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
 @pytest.mark.parametrize(
@@ -279,121 +279,121 @@ def test_normalize_size_when_no_items(view):
         ("square", "arrange_square", {}),
     ],
 )
-def test_arrange_default(value, expected_func, expected_kwargs, settings, view):
+def test_arrange_default(value, expected_func, expected_kwargs, settings, scene):
     settings.setValue("Items/arrange_default", value)
-    setattr(view.scene, expected_func, MagicMock())
-    view.scene.arrange_default()
-    getattr(view.scene, expected_func).assert_called_once_with(**expected_kwargs)
+    setattr(scene, expected_func, MagicMock())
+    scene.arrange_default()
+    getattr(scene, expected_func).assert_called_once_with(**expected_kwargs)
 
 
-def test_arrange_horizontal(view):
+def test_arrange_horizontal(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = "foo.png"
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(10, -100)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "bar.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-10, 40)
     item2.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange()
 
     assert item2.pos() == QtCore.QPointF(-50, -30)
     assert item1.pos() == QtCore.QPointF(50, -30)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_horizontal_with_gap(view, settings):
+def test_arrange_horizontal_with_gap(scene, settings):
     settings.setValue("Items/arrange_gap", 6)
 
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = "foo.png"
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(10, -100)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "bar.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-10, 40)
     item2.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange()
 
     assert item2.pos() == QtCore.QPointF(-50, -30)
     assert item1.pos() == QtCore.QPointF(56, -30)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_vertical(view):
+def test_arrange_vertical(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = "foo.png"
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(10, -100)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "bar.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-10, 40)
     item2.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange(vertical=True)
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange(vertical=True)
 
     assert item1.pos() == QtCore.QPointF(0, -70)
     assert item2.pos() == QtCore.QPointF(0, 10)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_vertical_with_gap(view, settings):
+def test_arrange_vertical_with_gap(scene, settings):
     settings.setValue("Items/arrange_gap", 6)
 
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = "foo.png"
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(10, -100)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "bar.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-10, 40)
     item2.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange(vertical=True)
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange(vertical=True)
 
     assert item1.pos() == QtCore.QPointF(0, -70)
     assert item2.pos() == QtCore.QPointF(0, 16)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_when_rotated(view):
+def test_arrange_when_rotated(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(10, -100)
     item1.setRotation(90)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-10, 40)
     item2.setRotation(90)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
     with patch.object(
         item1, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
@@ -401,225 +401,225 @@ def test_arrange_when_rotated(view):
         with patch.object(
             item2, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
         ):
-            view.scene.arrange()
+            scene.arrange()
 
     assert item2.pos() == QtCore.QPointF(-40, -30)
     assert item1.pos() == QtCore.QPointF(40, -30)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_arrange_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_optimal(view):
+def test_arrange_optimal(scene):
     for i in range(4):
         item = BeePixmapItem(QtGui.QImage())
-        view.scene.addItem(item)
+        scene.addItem(item)
         item.setSelected(True)
         item.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_optimal()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_optimal()
     expected_positions = {(-50, -40), (50, -40), (-50, 40), (50, 40)}
     actual_positions = {
-        (i.pos().x(), i.pos().y()) for i in view.scene.selectedItems(user_only=True)
+        (i.pos().x(), i.pos().y()) for i in scene.selectedItems(user_only=True)
     }
     assert expected_positions == actual_positions
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_optimal_with_gap(view, settings):
+def test_arrange_optimal_with_gap(scene, settings):
     settings.setValue("Items/arrange_gap", 6)
     for i in range(4):
         item = BeePixmapItem(QtGui.QImage())
-        view.scene.addItem(item)
+        scene.addItem(item)
         item.setSelected(True)
         item.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_optimal()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_optimal()
     expected_positions = {(-56, -46), (50, -46), (-56, 40), (50, 40)}
     actual_positions = {
-        (i.pos().x(), i.pos().y()) for i in view.scene.selectedItems(user_only=True)
+        (i.pos().x(), i.pos().y()) for i in scene.selectedItems(user_only=True)
     }
     assert expected_positions == actual_positions
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_optimal_when_rotated(view):
+def test_arrange_optimal_when_rotated(scene):
     for i in range(4):
         item = BeePixmapItem(QtGui.QImage())
-        view.scene.addItem(item)
+        scene.addItem(item)
         item.setRotation(90)
         item.setSelected(True)
         item.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_optimal()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_optimal()
 
     expected_positions = {(-40, -50), (40, -50), (-40, 50), (40, 50)}
     actual_positions = {
-        (i.pos().x(), i.pos().y()) for i in view.scene.selectedItems(user_only=True)
+        (i.pos().x(), i.pos().y()) for i in scene.selectedItems(user_only=True)
     }
     assert expected_positions == actual_positions
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_optimal_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_optimal()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_arrange_optimal_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_optimal()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_square(view):
+def test_arrange_square(scene):
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = None
     item1.created_at = 2.0
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "foo.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.crop = QtCore.QRectF(0, 0, 80, 60)
 
     item3 = BeePixmapItem(QtGui.QImage())
     item3.filename = None
     item3.created_at = 1.0
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setSelected(True)
     item3.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item4 = BeePixmapItem(QtGui.QImage())
     item4.filename = "bar.png"
-    view.scene.addItem(item4)
+    scene.addItem(item4)
     item4.setSelected(True)
     item4.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_square()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_square()
 
     assert item4.pos() == QtCore.QPointF(-50, -40)
     assert item2.pos() == QtCore.QPointF(60, -30)
     assert item3.pos() == QtCore.QPointF(-50, 40)
     assert item1.pos() == QtCore.QPointF(50, 40)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_square_with_gap(view, settings):
+def test_arrange_square_with_gap(scene, settings):
     settings.setValue("Items/arrange_gap", 6)
     item1 = BeePixmapItem(QtGui.QImage())
     item1.filename = None
     item1.created_at = 2.0
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item2 = BeePixmapItem(QtGui.QImage())
     item2.filename = "foo.png"
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.crop = QtCore.QRectF(0, 0, 80, 60)
 
     item3 = BeePixmapItem(QtGui.QImage())
     item3.filename = None
     item3.created_at = 1.0
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setSelected(True)
     item3.crop = QtCore.QRectF(0, 0, 100, 80)
 
     item4 = BeePixmapItem(QtGui.QImage())
     item4.filename = "bar.png"
-    view.scene.addItem(item4)
+    scene.addItem(item4)
     item4.setSelected(True)
     item4.crop = QtCore.QRectF(0, 0, 100, 80)
 
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_square()
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_square()
 
     assert item4.pos() == QtCore.QPointF(-53, -43)
     assert item2.pos() == QtCore.QPointF(63, -33)
     assert item3.pos() == QtCore.QPointF(-53, 43)
     assert item1.pos() == QtCore.QPointF(53, 43)
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_arrange_square_when_no_items(view):
-    view.scene.cancel_crop_mode = MagicMock()
-    view.scene.arrange_square()
-    view.scene.cancel_crop_mode.assert_called_once_with()
+def test_arrange_square_when_no_items(scene):
+    scene.cancel_crop_mode = MagicMock()
+    scene.arrange_square()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_flip_items(view, item):
-    view.scene.addItem(item)
+def test_flip_items(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
-    view.scene.undo_stack = MagicMock(push=MagicMock())
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.undo_stack = MagicMock(push=MagicMock())
+    scene.cancel_crop_mode = MagicMock()
     with patch(
         "beeref.scene.BeeGraphicsScene.itemsBoundingRect",
         return_value=QtCore.QRectF(10, 20, 100, 60),
     ):
-        view.scene.flip_items(vertical=True)
-        args = view.scene.undo_stack.push.call_args_list[0][0]
+        scene.flip_items(vertical=True)
+        args = scene.undo_stack.push.call_args_list[0][0]
         cmd = args[0]
         assert isinstance(cmd, commands.FlipItems)
         assert cmd.items == [item]
         assert cmd.anchor == QtCore.QPointF(60, 50)
         assert cmd.vertical is True
-        view.scene.cancel_crop_mode.assert_called_once_with()
+        scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_crop_items(view, item):
-    view.scene.addItem(item)
+def test_crop_items(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item.enter_crop_mode = MagicMock()
 
-    view.scene.crop_items()
+    scene.crop_items()
     item.enter_crop_mode.assert_called_once_with()
 
 
-def test_crop_items_when_in_crop_mode(view, item):
-    view.scene.addItem(item)
+def test_crop_items_when_in_crop_mode(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item.enter_crop_mode = MagicMock()
-    view.scene.crop_item = item
+    scene.crop_item = item
 
-    view.scene.crop_items()
+    scene.crop_items()
     item.enter_crop_mode.assert_not_called()
 
 
-def test_crop_item_multi_select(view, item):
-    view.scene.addItem(item)
+def test_crop_item_multi_select(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item.enter_crop_mode = MagicMock()
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
 
-    view.scene.crop_items()
+    scene.crop_items()
     item.enter_crop_mode.assert_not_called()
 
 
-def test_crop_item_no_selection(view, item):
-    view.scene.addItem(item)
+def test_crop_item_no_selection(scene, item):
+    scene.addItem(item)
     item.setSelected(False)
     item.enter_crop_mode = MagicMock()
 
-    view.scene.crop_items()
+    scene.crop_items()
     item.enter_crop_mode.assert_not_called()
 
 
-def test_crop_item_when_not_image(view):
+def test_crop_item_when_not_image(scene):
     item = BeeTextItem("foo")
     item.setSelected(True)
     item.enter_crop_mode = MagicMock()
 
-    view.scene.crop_items()
+    scene.crop_items()
     item.enter_crop_mode.assert_not_called()
 
 
@@ -642,121 +642,121 @@ def test_sample_color_at_when_no_item(view):
     assert view.scene.sample_color_at(QtCore.QPointF(2, 2)) is None
 
 
-def test_select_all_items_when_true(view):
+def test_select_all_items_when_true(scene):
     item1 = BeeTextItem("foo")
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeeTextItem("bar")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
-    view.scene.select_all_items()
+    scene.select_all_items()
     assert item1.isSelected() is True
     assert item2.isSelected() is True
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_deselect_all_items_when_false(view):
+def test_deselect_all_items_when_false(scene):
     item1 = BeeTextItem("foo")
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeeTextItem("bar")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    view.scene.cancel_crop_mode = MagicMock()
+    scene.cancel_crop_mode = MagicMock()
 
-    view.scene.deselect_all_items()
+    scene.deselect_all_items()
     assert item1.isSelected() is False
     assert item2.isSelected() is False
-    view.scene.cancel_crop_mode.assert_called_once_with()
+    scene.cancel_crop_mode.assert_called_once_with()
 
 
-def test_has_selection_when_no_selection(view, item):
-    view.scene.addItem(item)
-    assert view.scene.has_selection() is False
+def test_has_selection_when_no_selection(scene, item):
+    scene.addItem(item)
+    assert scene.has_selection() is False
 
 
-def test_has_selection_when_selection(view, item):
-    view.scene.addItem(item)
+def test_has_selection_when_selection(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
-    assert view.scene.has_selection() is True
+    assert scene.has_selection() is True
 
 
-def test_has_single_selection_when_no_selection(view, item):
-    view.scene.addItem(item)
-    assert view.scene.has_single_selection() is False
+def test_has_single_selection_when_no_selection(scene, item):
+    scene.addItem(item)
+    assert scene.has_single_selection() is False
 
 
-def test_has_single_selection_when_single_selection(view):
+def test_has_single_selection_when_single_selection(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
-    assert view.scene.has_single_selection() is True
+    scene.addItem(item2)
+    assert scene.has_single_selection() is True
 
 
-def test_has_single_selection_when_multi_selection(view):
+def test_has_single_selection_when_multi_selection(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    assert view.scene.has_single_selection() is False
+    assert scene.has_single_selection() is False
 
 
-def test_has_multi_selection_when_no_selection(view, item):
-    view.scene.addItem(item)
-    assert view.scene.has_multi_selection() is False
+def test_has_multi_selection_when_no_selection(scene, item):
+    scene.addItem(item)
+    assert scene.has_multi_selection() is False
 
 
-def test_has_multi_selection_when_single_selection(view):
+def test_has_multi_selection_when_single_selection(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
-    assert view.scene.has_multi_selection() is False
+    scene.addItem(item2)
+    assert scene.has_multi_selection() is False
 
 
-def test_has_multi_selection_when_multi_selection(view):
+def test_has_multi_selection_when_multi_selection(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    assert view.scene.has_multi_selection() is True
+    assert scene.has_multi_selection() is True
 
 
-def test_has_single_image_selection(view, item):
-    view.scene.addItem(item)
+def test_has_single_image_selection(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
-    assert view.scene.has_single_image_selection() is True
+    assert scene.has_single_image_selection() is True
 
 
-def test_has_single_image_selection_when_item_not_image(view):
+def test_has_single_image_selection_when_item_not_image(scene):
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(True)
-    assert view.scene.has_single_image_selection() is False
+    assert scene.has_single_image_selection() is False
 
 
-def test_has_single_image_selection_when_no_selection(view, item):
-    view.scene.addItem(item)
+def test_has_single_image_selection_when_no_selection(scene, item):
+    scene.addItem(item)
     item.setSelected(False)
-    assert view.scene.has_single_image_selection() is False
+    assert scene.has_single_image_selection() is False
 
 
-def test_has_single_image_selection_when_multi_selection(view, item):
-    view.scene.addItem(item)
+def test_has_single_image_selection_when_multi_selection(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    assert view.scene.has_single_image_selection() is False
+    assert scene.has_single_image_selection() is False
 
 
 @patch("PyQt6.QtWidgets.QGraphicsScene.mousePressEvent")
@@ -1161,71 +1161,71 @@ def test_mouse_release_event_when_multiselect_action_active(mouse_mock, view):
     assert view.scene.active_mode is None
 
 
-def test_selected_items(view):
+def test_selected_items(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    selected = view.scene.selectedItems()
+    selected = scene.selectedItems()
     assert len(selected) == 3  # Multi select item!
     assert item1 in selected
     assert item2 in selected
 
 
-def test_selected_items_user_only(view):
+def test_selected_items_user_only(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
-    selected = view.scene.selectedItems(user_only=True)
+    selected = scene.selectedItems(user_only=True)
     assert len(selected) == 2  # No multi select item!
     assert item1 in selected
     assert item2 in selected
 
 
-def test_items_by_tpe(view):
+def test_items_by_tpe(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeeTextItem("foo")
-    view.scene.addItem(item2)
-    assert list(view.scene.items_by_type("text")) == [item2]
+    scene.addItem(item2)
+    assert list(scene.items_by_type("text")) == [item2]
 
 
-def test_user_items(view):
+def test_user_items(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item3 = QtWidgets.QGraphicsRectItem()
-    view.scene.addItem(item3)
+    scene.addItem(item3)
 
-    items = list(view.scene.user_items())
+    items = list(scene.user_items())
     assert items == [item1, item2]
 
 
-def test_on_view_scale_change(view, item):
-    view.scene.addItem(item)
+def test_on_view_scale_change(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item.on_view_scale_change = MagicMock()
-    view.scene.on_view_scale_change()
+    scene.on_view_scale_change()
     item.on_view_scale_change.assert_called_once()
 
 
-def test_items_bounding_rect_given_items(view):
+def test_items_bounding_rect_given_items(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(4, -6)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-33, 22)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setSelected(True)
     item3.setPos(1000, 1000)
 
@@ -1237,7 +1237,7 @@ def test_items_bounding_rect_given_items(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 100, 100),
         ):
-            rect = view.scene.itemsBoundingRect(items=[item1, item2])
+            rect = scene.itemsBoundingRect(items=[item1, item2])
 
     assert rect.topLeft().x() == -33
     assert rect.topLeft().y() == -6
@@ -1245,17 +1245,17 @@ def test_items_bounding_rect_given_items(view):
     assert rect.bottomRight().y() == 122
 
 
-def test_items_bounding_rect_two_items_selection_only(view):
+def test_items_bounding_rect_two_items_selection_only(scene):
     item1 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item1)
+    scene.addItem(item1)
     item1.setSelected(True)
     item1.setPos(4, -6)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item2.setPos(-33, 22)
     item3 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item3)
+    scene.addItem(item3)
     item3.setSelected(False)
     item3.setPos(1000, 1000)
 
@@ -1267,7 +1267,7 @@ def test_items_bounding_rect_two_items_selection_only(view):
             "bounding_rect_unselected",
             return_value=QtCore.QRectF(0, 0, 100, 100),
         ):
-            rect = view.scene.itemsBoundingRect(selection_only=True)
+            rect = scene.itemsBoundingRect(selection_only=True)
 
     assert rect.topLeft().x() == -33
     assert rect.topLeft().y() == -6
@@ -1275,14 +1275,14 @@ def test_items_bounding_rect_two_items_selection_only(view):
     assert rect.bottomRight().y() == 122
 
 
-def test_items_bounding_rect_rotated_item(view, item):
-    view.scene.addItem(item)
+def test_items_bounding_rect_rotated_item(scene, item):
+    scene.addItem(item)
     item.setRotation(-45)
 
     with patch.object(
         item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 100)
     ):
-        rect = view.scene.itemsBoundingRect()
+        rect = scene.itemsBoundingRect()
 
     assert rect.topLeft().x() == 0
     assert rect.topLeft().y() == approx(-math.sqrt(2) * 50)
@@ -1290,14 +1290,14 @@ def test_items_bounding_rect_rotated_item(view, item):
     assert rect.bottomRight().y() == approx(math.sqrt(2) * 50)
 
 
-def test_items_bounding_rect_flipped_item(view):
+def test_items_bounding_rect_flipped_item(scene):
     item = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.do_flip()
     with patch.object(
         item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 50, 100)
     ):
-        rect = view.scene.itemsBoundingRect()
+        rect = scene.itemsBoundingRect()
 
     assert rect.topLeft().x() == -50
     assert rect.topLeft().y() == 0
@@ -1305,128 +1305,128 @@ def test_items_bounding_rect_flipped_item(view):
     assert rect.bottomRight().y() == 100
 
 
-def test_items_bounding_rect_when_no_items(view):
-    rect = view.scene.itemsBoundingRect()
+def test_items_bounding_rect_when_no_items(scene):
+    rect = scene.itemsBoundingRect()
     assert rect == QtCore.QRectF(0, 0, 0, 0)
 
 
-def test_get_selection_center(view):
+def test_get_selection_center(scene):
     with patch(
         "beeref.scene.BeeGraphicsScene.itemsBoundingRect",
         return_value=QtCore.QRectF(10, 20, 100, 60),
     ):
-        center = view.scene.get_selection_center()
+        center = scene.get_selection_center()
         assert center == QtCore.QPointF(60, 50)
 
 
-def test_on_selection_change_when_multi_selection_new(view):
-    view.scene.has_multi_selection = MagicMock(return_value=True)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.bring_to_front = MagicMock()
-    view.scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
-    view.scene.addItem = MagicMock()
+def test_on_selection_change_when_multi_selection_new(scene):
+    scene.has_multi_selection = MagicMock(return_value=True)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.bring_to_front = MagicMock()
+    scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
+    scene.addItem = MagicMock()
 
-    view.scene.on_selection_change()
+    scene.on_selection_change()
 
-    m_item = view.scene.multi_select_item
+    m_item = scene.multi_select_item
     m_item.fit_selection_area.assert_called_once_with(QtCore.QRectF(0, 0, 100, 80))
     m_item.bring_to_front.assert_called_once()
-    view.scene.addItem.assert_called_once_with(m_item)
+    scene.addItem.assert_called_once_with(m_item)
 
 
-def test_on_selection_change_when_multi_selection_existing(view):
-    view.scene.addItem(view.scene.multi_select_item)
-    view.scene.has_multi_selection = MagicMock(return_value=True)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.bring_to_front = MagicMock()
-    view.scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
-    view.scene.addItem = MagicMock()
+def test_on_selection_change_when_multi_selection_existing(scene):
+    scene.addItem(scene.multi_select_item)
+    scene.has_multi_selection = MagicMock(return_value=True)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.bring_to_front = MagicMock()
+    scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
+    scene.addItem = MagicMock()
 
-    view.scene.on_selection_change()
+    scene.on_selection_change()
 
-    m_item = view.scene.multi_select_item
+    m_item = scene.multi_select_item
     m_item.fit_selection_area.assert_called_once_with(QtCore.QRectF(0, 0, 100, 80))
     m_item.bring_to_front.assert_not_called()
-    view.scene.addItem.assert_not_called()
+    scene.addItem.assert_not_called()
 
 
-def test_on_selection_change_when_multi_selection_ended(view):
-    view.scene.addItem(view.scene.multi_select_item)
-    view.scene.has_multi_selection = MagicMock(return_value=False)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.bring_to_front = MagicMock()
-    view.scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
-    view.scene.removeItem = MagicMock()
+def test_on_selection_change_when_multi_selection_ended(scene):
+    scene.addItem(scene.multi_select_item)
+    scene.has_multi_selection = MagicMock(return_value=False)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.bring_to_front = MagicMock()
+    scene.itemsBoundingRect = MagicMock(return_value=QtCore.QRectF(0, 0, 100, 80))
+    scene.removeItem = MagicMock()
 
-    view.scene.on_selection_change()
+    scene.on_selection_change()
 
-    m_item = view.scene.multi_select_item
+    m_item = scene.multi_select_item
     m_item.fit_selection_area.assert_not_called()
-    view.scene.removeItem.assert_called_once_with(m_item)
+    scene.removeItem.assert_called_once_with(m_item)
 
 
-def test_on_change_when_multi_select_when_no_scale_no_rotate(view):
-    view.scene.addItem(view.scene.multi_select_item)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.active_mode = None
-    view.scene.on_change(None)
-    view.scene.multi_select_item.fit_selection_area.assert_called_once()
+def test_on_change_when_multi_select_when_no_scale_no_rotate(scene):
+    scene.addItem(scene.multi_select_item)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.active_mode = None
+    scene.on_change(None)
+    scene.multi_select_item.fit_selection_area.assert_called_once()
 
 
-def test_on_change_when_multi_select_when_scale_active(view):
-    view.scene.addItem(view.scene.multi_select_item)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.active_mode = BeePixmapItem.SCALE_MODE
-    view.scene.on_change(None)
-    view.scene.multi_select_item.fit_selection_area.assert_not_called()
+def test_on_change_when_multi_select_when_scale_active(scene):
+    scene.addItem(scene.multi_select_item)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.active_mode = BeePixmapItem.SCALE_MODE
+    scene.on_change(None)
+    scene.multi_select_item.fit_selection_area.assert_not_called()
 
 
-def test_on_change_when_multi_select_when_rotate_active(view):
-    view.scene.addItem(view.scene.multi_select_item)
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.active_mode = BeePixmapItem.ROTATE_MODE
-    view.scene.on_change(None)
-    view.scene.multi_select_item.fit_selection_area.assert_not_called()
+def test_on_change_when_multi_select_when_rotate_active(scene):
+    scene.addItem(scene.multi_select_item)
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.active_mode = BeePixmapItem.ROTATE_MODE
+    scene.on_change(None)
+    scene.multi_select_item.fit_selection_area.assert_not_called()
 
 
-def test_on_change_when_no_multi_select(view):
-    view.scene.multi_select_item.fit_selection_area = MagicMock()
-    view.scene.multi_select_item.active_mode = BeePixmapItem.SCALE_MODE
-    view.scene.on_change(None)
-    view.scene.multi_select_item.fit_selection_area.assert_not_called()
+def test_on_change_when_no_multi_select(scene):
+    scene.multi_select_item.fit_selection_area = MagicMock()
+    scene.multi_select_item.active_mode = BeePixmapItem.SCALE_MODE
+    scene.on_change(None)
+    scene.multi_select_item.fit_selection_area.assert_not_called()
 
 
-def test_add_queued_items_unselected(view):
+def test_add_queued_items_unselected(scene):
     data = {"type": "text", "z": 0.33, "data": {"text": "foo"}}
-    view.scene.add_item_later(data, selected=False)
-    view.scene.add_queued_items()
-    assert len(view.scene.items()) == 1
-    item = view.scene.items()[0]
+    scene.add_item_later(data, selected=False)
+    scene.add_queued_items()
+    assert len(scene.items()) == 1
+    item = scene.items()[0]
     assert item.isSelected() is False
-    assert view.scene.max_z == 0.33
+    assert scene.max_z == 0.33
     assert item._markdown == "foo"
 
 
-def test_add_queued_items_selected(view):
-    view.scene.max_z = 0.6
+def test_add_queued_items_selected(scene):
+    scene.max_z = 0.6
     data = {"type": "text", "z": 0.33, "data": {"text": "foo"}}
-    view.scene.add_item_later(data, selected=True)
-    view.scene.add_queued_items()
-    assert len(view.scene.items()) == 1
-    item = view.scene.items()[0]
+    scene.add_item_later(data, selected=True)
+    scene.add_queued_items()
+    assert len(scene.items()) == 1
+    item = scene.items()[0]
     assert item.isSelected() is True
     assert item.zValue() > 0.6
 
 
-def test_add_queued_items_when_no_items(view):
-    view.scene.add_queued_items()
-    assert view.scene.items() == []
+def test_add_queued_items_when_no_items(scene):
+    scene.add_queued_items()
+    assert scene.items() == []
 
 
-def test_add_queued_items_ignores_unknown_type(view):
+def test_add_queued_items_ignores_unknown_type(scene):
     data = {"type": "foo", "z": 0.33, "data": {"bar": "baz"}}
-    view.scene.add_item_later(data, selected=False)
-    view.scene.add_queued_items()
-    assert len(view.scene.items()) == 1
-    item = view.scene.items()[0]
+    scene.add_item_later(data, selected=False)
+    scene.add_queued_items()
+    assert len(scene.items()) == 1
+    item = scene.items()[0]
     assert item.toPlainText() == "Item of unknown type: foo"

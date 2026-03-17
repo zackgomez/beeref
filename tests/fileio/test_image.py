@@ -1,5 +1,6 @@
 import math
 import os.path
+from pathlib import Path
 
 import httpretty
 import pytest
@@ -54,13 +55,13 @@ def test_load_pil_image_exif_orientation(path, expected, qapp):
 
 
 def test_load_image_loads_from_filename(view, imgfilename3x3):
-    img, filename = load_image(imgfilename3x3)
+    img, filename = load_image(Path(imgfilename3x3))
     assert img.isNull() is False
     assert filename == imgfilename3x3
 
 
 def test_load_image_loads_from_nonexisting_filename(view, imgfilename3x3):
-    img, filename = load_image("foo.png")
+    img, filename = load_image(Path("foo.png"))
     assert img.isNull() is True
     assert filename == "foo.png"
 

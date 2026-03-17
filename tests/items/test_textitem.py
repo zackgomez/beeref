@@ -23,9 +23,9 @@ def test_init(selectable_mock, qapp):
     selectable_mock.assert_called_once()
 
 
-def test_sample_color_at(qapp, view):
+def test_sample_color_at(qapp, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     assert item.sample_color_at(QtCore.QPointF(2.0, 2.0)) is None
 
 
@@ -95,57 +95,57 @@ def test_paint(paint_mock, qapp):
     paint_mock.assert_called_once_with(painter, option, "widget")
 
 
-def test_has_selection_outline_when_not_selected(view):
+def test_has_selection_outline_when_not_selected(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(False)
     item.has_selection_outline() is False
 
 
-def test_has_selection_outline_when_selected(view):
+def test_has_selection_outline_when_selected(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(True)
     item.has_selection_outline() is True
 
 
-def test_has_selection_handles_when_not_selected(view):
+def test_has_selection_handles_when_not_selected(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(False)
     item2 = BeeTextItem("baz")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(False)
     item.has_selection_handles() is False
 
 
-def test_has_selection_handles_when_selected_single(view):
+def test_has_selection_handles_when_selected_single(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeeTextItem("baz")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(False)
     item.has_selection_handles() is True
 
 
-def test_has_selection_handles_when_selected_multi(view):
+def test_has_selection_handles_when_selected_multi(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeeTextItem("baz")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item.has_selection_handles() is False
 
 
-def test_has_selection_handles_when_selected_single_and_edit_mode(view):
+def test_has_selection_handles_when_selected_single_and_edit_mode(scene):
     item = BeeTextItem("foo bar")
     item.edit_mode = False
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeeTextItem("baz")
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(False)
     item.has_selection_handles() is False
 
@@ -202,90 +202,90 @@ def test_create_copy(qapp):
     assert copy.scale() == 2.2
 
 
-def test_enter_edit_mode(view):
+def test_enter_edit_mode(scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
+    scene.addItem(item)
     item.enter_edit_mode()
     assert item.edit_mode is True
-    assert view.scene.edit_item == item
+    assert scene.edit_item == item
     flags = item.textInteractionFlags()
     assert flags == Qt.TextInteractionFlag.TextEditorInteraction
 
 
 @patch("PyQt6.QtGui.QTextCursor")
 @patch("beeref.items.BeeTextItem.setTextCursor")
-def test_exit_edit_mode(setcursor_mock, cursor_mock, view):
+def test_exit_edit_mode(setcursor_mock, cursor_mock, scene):
     item = BeeTextItem("foo bar")
     item.edit_mode = True
     item.old_text = "old"
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     item.exit_edit_mode()
     assert item.edit_mode is False
-    assert view.scene.edit_item is None
+    assert scene.edit_item is None
     flags = item.textInteractionFlags()
     assert flags == Qt.TextInteractionFlag.NoTextInteraction
     cursor_mock.assert_called_once_with(item.document())
     setcursor_mock.assert_called_once_with(cursor_mock.return_value)
-    assert view.scene.edit_item is None
+    assert scene.edit_item is None
 
 
-def test_exit_edit_mode_when_text_empty(view):
+def test_exit_edit_mode_when_text_empty(scene):
     item = BeeTextItem(" \r\n\t")
     item.edit_mode = True
     item.old_text = "old"
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     item.exit_edit_mode()
     assert item.edit_mode is False
-    assert view.scene.edit_item is None
+    assert scene.edit_item is None
     flags = item.textInteractionFlags()
     assert flags == Qt.TextInteractionFlag.NoTextInteraction
     assert item.scene() is None
-    assert view.scene.items() == []
-    assert view.scene.edit_item is None
+    assert scene.items() == []
+    assert scene.edit_item is None
 
 
 @patch("PyQt6.QtGui.QTextCursor")
 @patch("beeref.items.BeeTextItem.setTextCursor")
-def test_exit_edit_mode_when_commit_false(setcursor_mock, cursor_mock, view):
+def test_exit_edit_mode_when_commit_false(setcursor_mock, cursor_mock, scene):
     item = BeeTextItem("foo bar")
     item.edit_mode = True
     item.old_text = "old"
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     item.exit_edit_mode(commit=False)
     assert item.edit_mode is False
-    assert view.scene.edit_item is None
+    assert scene.edit_item is None
     flags = item.textInteractionFlags()
     assert flags == Qt.TextInteractionFlag.NoTextInteraction
     cursor_mock.assert_called_once_with(item.document())
     setcursor_mock.assert_called_once_with(cursor_mock.return_value)
-    assert view.scene.edit_item is None
+    assert scene.edit_item is None
     assert item._markdown == "old"
 
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_any_key(exit_mock, key_press_mock, view):
+def test_key_press_event_any_key(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_T
     event.modifiers.return_value = Qt.KeyboardModifier.NoModifier
     item.keyPressEvent(event)
     key_press_mock.assert_called_once_with(event)
     exit_mock.assert_not_called()
-    assert view.scene.edit_item == item
+    assert scene.edit_item == item
 
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_shift_return(exit_mock, key_press_mock, view):
+def test_key_press_event_shift_return(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_Return
     event.modifiers.return_value = Qt.KeyboardModifier.ShiftModifier
@@ -296,10 +296,10 @@ def test_key_press_event_shift_return(exit_mock, key_press_mock, view):
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_shift_enter(exit_mock, key_press_mock, view):
+def test_key_press_event_shift_enter(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_Enter
     event.modifiers.return_value = Qt.KeyboardModifier.ShiftModifier
@@ -310,10 +310,10 @@ def test_key_press_event_shift_enter(exit_mock, key_press_mock, view):
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_return(exit_mock, key_press_mock, view):
+def test_key_press_event_return(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_Return
     event.modifiers.return_value = Qt.KeyboardModifier.NoModifier
@@ -324,10 +324,10 @@ def test_key_press_event_return(exit_mock, key_press_mock, view):
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_enter(exit_mock, key_press_mock, view):
+def test_key_press_event_enter(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_Enter
     event.modifiers.return_value = Qt.KeyboardModifier.NoModifier
@@ -338,10 +338,10 @@ def test_key_press_event_enter(exit_mock, key_press_mock, view):
 
 @patch("PyQt6.QtWidgets.QGraphicsTextItem.keyPressEvent")
 @patch("beeref.items.BeeTextItem.exit_edit_mode")
-def test_key_press_event_escape(exit_mock, key_press_mock, view):
+def test_key_press_event_escape(exit_mock, key_press_mock, scene):
     item = BeeTextItem("foo bar")
-    view.scene.addItem(item)
-    view.scene.edit_item = item
+    scene.addItem(item)
+    scene.edit_item = item
     event = MagicMock()
     event.key.return_value = Qt.Key.Key_Escape
     event.modifiers.return_value = Qt.KeyboardModifier.NoModifier

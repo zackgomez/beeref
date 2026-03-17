@@ -18,8 +18,8 @@ from beeref.types.snapshot import IOResult
     "beeref.widgets.SceneToPixmapExporterDialog.value",
     return_value=QtCore.QSize(100, 200),
 )
-def test_scene_to_pixmap_exporter_get_user_input(value_mock, exec_mock, view):
-    exporter = SceneToPixmapExporter(view.scene)
+def test_scene_to_pixmap_exporter_get_user_input(value_mock, exec_mock, scene):
+    exporter = SceneToPixmapExporter(scene)
     value = exporter.get_user_input(None)
     assert value is True
     assert exporter.size == QtCore.QSize(100, 200)
@@ -28,49 +28,49 @@ def test_scene_to_pixmap_exporter_get_user_input(value_mock, exec_mock, view):
 @patch("beeref.widgets.SceneToPixmapExporterDialog.exec", return_value=False)
 @patch("beeref.widgets.SceneToPixmapExporterDialog.value")
 def test_scene_to_pixmap_exporter_get_user_input_when_canceled(
-    value_mock, exec_mock, view
+    value_mock, exec_mock, scene
 ):
-    exporter = SceneToPixmapExporter(view.scene)
+    exporter = SceneToPixmapExporter(scene)
     value = exporter.get_user_input(None)
     assert value is False
 
 
-def test_scene_to_pixmap_exporter_default_size_and_margin(view):
+def test_scene_to_pixmap_exporter_default_size_and_margin(scene):
     item1 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(0, 0))
-    view.scene.addItem(item1)
+    scene.addItem(item1)
 
     item2 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(200, 0))
-    view.scene.addItem(item2)
+    scene.addItem(item2)
 
-    exporter = SceneToPixmapExporter(view.scene)
-    assert view.scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
+    exporter = SceneToPixmapExporter(scene)
+    assert scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
     assert (exporter.margin - 9) < 0.000001
     assert exporter.default_size == QtCore.QSize(318, 118)
 
 
-def test_scene_to_pixmap_exporter_default_size_and_margin_when_selection(view):
+def test_scene_to_pixmap_exporter_default_size_and_margin_when_selection(scene):
     item1 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(0, 0))
-    view.scene.addItem(item1)
+    scene.addItem(item1)
 
     item2 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(200, 0))
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
 
-    exporter = SceneToPixmapExporter(view.scene)
-    assert view.scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
+    exporter = SceneToPixmapExporter(scene)
+    assert scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
     assert (exporter.margin - 9) < 0.000001
     assert exporter.default_size == QtCore.QSize(318, 118)
 
 
 @patch("beeref.scene.BeeGraphicsScene.render")
-def test_scene_to_pixmap_exporter_render_sets_margins(render_mock, view):
+def test_scene_to_pixmap_exporter_render_sets_margins(render_mock, scene):
     item = BeePixmapItem(QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32))
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     assert exporter.margin == 36
     assert exporter.default_size == QtCore.QSize(1072, 1272)
 
@@ -84,12 +84,12 @@ def test_scene_to_pixmap_exporter_render_sets_margins(render_mock, view):
     )
 
 
-def test_scene_to_pixmap_exporter_render_renders_scene(view):
+def test_scene_to_pixmap_exporter_render_renders_scene(scene):
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item_img.fill(QtGui.QColor(11, 22, 33))
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     assert exporter.margin == 36
     assert exporter.default_size == QtCore.QSize(1072, 1272)
 
@@ -99,12 +99,12 @@ def test_scene_to_pixmap_exporter_render_renders_scene(view):
     assert image.pixel(100, 100) == QtGui.QColor(11, 22, 33)
 
 
-def test_scene_to_pixmap_exporter_export_writes_image(view, tmp_path):
+def test_scene_to_pixmap_exporter_export_writes_image(scene, tmp_path):
     filename = tmp_path / "foo.png"
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     exporter.export(filename)
 
@@ -112,12 +112,12 @@ def test_scene_to_pixmap_exporter_export_writes_image(view, tmp_path):
         assert f.read().startswith(b"\x89PNG")
 
 
-def test_scene_to_pixmap_exporter_export_with_worker(view, tmp_path):
+def test_scene_to_pixmap_exporter_export_with_worker(scene, tmp_path):
     filename = tmp_path / "foo.png"
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=False)
     exporter.export(filename, worker)
@@ -131,12 +131,12 @@ def test_scene_to_pixmap_exporter_export_with_worker(view, tmp_path):
         assert f.read().startswith(b"\x89PNG")
 
 
-def test_scene_to_pixmap_exporter_export_with_worker_when_canceled(view, tmp_path):
+def test_scene_to_pixmap_exporter_export_with_worker_when_canceled(scene, tmp_path):
     filename = tmp_path / "foo.png"
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=True)
     exporter.export(filename, worker)
@@ -149,15 +149,15 @@ def test_scene_to_pixmap_exporter_export_with_worker_when_canceled(view, tmp_pat
     os.path.exists(filename) is False
 
 
-def test_scene_to_pixmap_exporter_export_when_file_not_writeable(view, tmp_path):
+def test_scene_to_pixmap_exporter_export_when_file_not_writeable(scene, tmp_path):
     filename = tmp_path / "foo.png"
     with open(filename, "w") as f:
         f.write("foo")
     os.chmod(filename, stat.S_IREAD)
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
 
     with pytest.raises(BeeFileIOError) as e:
@@ -166,7 +166,7 @@ def test_scene_to_pixmap_exporter_export_when_file_not_writeable(view, tmp_path)
 
 
 def test_scene_to_pixmap_exporter_export_when_file_not_writeable_with_worker(
-    view, tmp_path
+    scene, tmp_path
 ):
     filename = tmp_path / "foo.png"
     with open(filename, "w") as f:
@@ -174,8 +174,8 @@ def test_scene_to_pixmap_exporter_export_when_file_not_writeable_with_worker(
     os.chmod(filename, stat.S_IREAD)
     item_img = QtGui.QImage(1000, 1200, QtGui.QImage.Format.Format_RGB32)
     item = BeePixmapItem(item_img)
-    view.scene.addItem(item)
-    exporter = SceneToPixmapExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToPixmapExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=False)
 

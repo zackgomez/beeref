@@ -17,7 +17,7 @@ def test_init_selectable(view):
 
 
 def test_on_view_scale_change(view, item):
-    with patch('beeref.items.BeePixmapItem.prepareGeometryChange') as m:
+    with patch("beeref.items.BeePixmapItem.prepareGeometryChange") as m:
         item.on_view_scale_change()
         m.assert_called_once()
 
@@ -67,49 +67,46 @@ def test_select_handle_free_center(view, item):
     view.scene.addItem(item)
     view.scale(0.5, 0.5)
     item.SELECT_FREE_CENTER = 10
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        assert item.select_handle_free_center() == QtCore.QRectF(
-            40, 30, 20, 20)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        assert item.select_handle_free_center() == QtCore.QRectF(40, 30, 20, 20)
 
 
-def test_draw_debug_shape_rect(view, item):
-    view.scene.addItem(item)
+def test_draw_debug_shape_rect(scene, item):
+    scene.addItem(item)
     painter = MagicMock(
         combinedTransform=MagicMock(
-            return_value=MagicMock(
-                m11=MagicMock(return_value=0.5))))
-    item.draw_debug_shape(
-        painter,
-        QtCore.QRectF(5, 6, 20, 30),
-        255, 0, 0)
+            return_value=MagicMock(m11=MagicMock(return_value=0.5))
+        )
+    )
+    item.draw_debug_shape(painter, QtCore.QRectF(5, 6, 20, 30), 255, 0, 0)
     painter.fillRect.assert_called_once()
     painter.fillPath.assert_not_called()
 
 
-def test_draw_debug_shape_path(view, item):
-    view.scene.addItem(item)
+def test_draw_debug_shape_path(scene, item):
+    scene.addItem(item)
     painter = MagicMock(
         combinedTransform=MagicMock(
-            return_value=MagicMock(
-                m11=MagicMock(return_value=0.5))))
+            return_value=MagicMock(m11=MagicMock(return_value=0.5))
+        )
+    )
     path = QtGui.QPainterPath()
     path.addRect(QtCore.QRectF(5, 6, 20, 30))
-    item.draw_debug_shape(
-        painter,
-        path,
-        0, 255, 0)
+    item.draw_debug_shape(painter, path, 0, 255, 0)
     painter.fillPath.assert_called_once()
     painter.fillRect.assert_not_called()
 
 
-@patch('beeref.items.BeePixmapItem.draw_debug_shape')
-def test_paint_when_not_selected(debug_mock, view, item):
-    view.scene.addItem(item)
+@patch("beeref.items.BeePixmapItem.draw_debug_shape")
+def test_paint_when_not_selected(debug_mock, scene, item):
+    scene.addItem(item)
     painter = MagicMock(
         combinedTransform=MagicMock(
-            return_value=MagicMock(
-                m11=MagicMock(return_value=0.5))))
+            return_value=MagicMock(m11=MagicMock(return_value=0.5))
+        )
+    )
     item.setSelected(False)
     item.paint(painter, None, None)
     painter.drawPixmap.assert_called_once()
@@ -118,12 +115,13 @@ def test_paint_when_not_selected(debug_mock, view, item):
     debug_mock.assert_not_called()
 
 
-def test_paint_when_selected_single_selection(view, item):
-    view.scene.addItem(item)
+def test_paint_when_selected_single_selection(scene, item):
+    scene.addItem(item)
     painter = MagicMock(
         combinedTransform=MagicMock(
-            return_value=MagicMock(
-                m11=MagicMock(return_value=0.5))))
+            return_value=MagicMock(m11=MagicMock(return_value=0.5))
+        )
+    )
     item.setSelected(True)
     item.paint(painter, None, None)
     painter.drawPixmap.assert_called_once()
@@ -131,15 +129,16 @@ def test_paint_when_selected_single_selection(view, item):
     assert painter.drawPoint.call_count == 4
 
 
-def test_paint_when_selected_multi_selection(view, item):
-    view.scene.addItem(item)
+def test_paint_when_selected_multi_selection(scene, item):
+    scene.addItem(item)
     item2 = BeePixmapItem(QtGui.QImage())
     item2.setSelected(True)
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     painter = MagicMock(
         combinedTransform=MagicMock(
-            return_value=MagicMock(
-                m11=MagicMock(return_value=0.5))))
+            return_value=MagicMock(m11=MagicMock(return_value=0.5))
+        )
+    )
     item.setSelected(True)
     item.paint(painter, None, None)
     painter.drawPixmap.assert_called_once()
@@ -148,55 +147,59 @@ def test_paint_when_selected_multi_selection(view, item):
 
 
 def test_paint_when_debug_shapes(view):
-    with patch('beeref.selection.commandline_args') as args_mock:
-        with patch('beeref.items.BeePixmapItem.draw_debug_shape') as m:
+    with patch("beeref.selection.commandline_args") as args_mock:
+        with patch("beeref.items.BeePixmapItem.draw_debug_shape") as m:
             args_mock.debug_shapes = True
             args_mock.debug_boundingrects = False
             args_mock.debug_handles = False
             item = BeePixmapItem(QtGui.QImage())
             painter = MagicMock(
                 combinedTransform=MagicMock(
-                    return_value=MagicMock(
-                        m11=MagicMock(return_value=0.5))))
+                    return_value=MagicMock(m11=MagicMock(return_value=0.5))
+                )
+            )
             item.paint(painter, None, None)
             m.assert_called_once()
 
 
 def test_paint_when_debug_boundingrects(view):
-    with patch('beeref.selection.commandline_args') as args_mock:
-        with patch('beeref.items.BeePixmapItem.draw_debug_shape') as m:
+    with patch("beeref.selection.commandline_args") as args_mock:
+        with patch("beeref.items.BeePixmapItem.draw_debug_shape") as m:
             args_mock.debug_shapes = False
             args_mock.debug_boundingrects = True
             args_mock.debug_handles = False
             item = BeePixmapItem(QtGui.QImage())
             painter = MagicMock(
                 combinedTransform=MagicMock(
-                    return_value=MagicMock(
-                        m11=MagicMock(return_value=0.5))))
+                    return_value=MagicMock(m11=MagicMock(return_value=0.5))
+                )
+            )
             item.paint(painter, None, None)
             m.assert_called_once()
 
 
-def test_paint_when_debug_handles(view):
-    with patch('beeref.selection.commandline_args') as args_mock:
-        with patch('beeref.items.BeePixmapItem.draw_debug_shape') as m:
+def test_paint_when_debug_handles(scene):
+    with patch("beeref.selection.commandline_args") as args_mock:
+        with patch("beeref.items.BeePixmapItem.draw_debug_shape") as m:
             args_mock.debug_shapes = False
             args_mock.debug_boundingrects = False
             args_mock.debug_handles = True
             item = BeePixmapItem(QtGui.QImage())
-            view.scene.addItem(item)
+            scene.addItem(item)
             item.setSelected(True)
             painter = MagicMock(
                 combinedTransform=MagicMock(
-                    return_value=MagicMock(
-                        m11=MagicMock(return_value=0.5))))
+                    return_value=MagicMock(m11=MagicMock(return_value=0.5))
+                )
+            )
             item.paint(painter, None, None)
             m.assert_called()
 
 
 def test_corners(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         assert len(item.corners) == 4
         assert QtCore.QPointF(0, 0) in item.corners
         assert QtCore.QPointF(100, 0) in item.corners
@@ -206,8 +209,9 @@ def test_corners(view, item):
 
 def test_corners_scene_coords_translated(view, item):
     item.setPos(5, 5)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         corners = item.corners_scene_coords
         assert len(corners) == 4
         assert QtCore.QPointF(5, 5) in corners
@@ -218,8 +222,9 @@ def test_corners_scene_coords_translated(view, item):
 
 def test_corners_scene_coords_scaled(view, item):
     item.setScale(2)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         corners = item.corners_scene_coords
         assert len(corners) == 4
         assert QtCore.QPointF(0, 0) in corners
@@ -230,8 +235,7 @@ def test_corners_scene_coords_scaled(view, item):
 
 def test_get_scale_bounds(view, item):
     item.SELECT_RESIZE_SIZE = 10
-    rect = item.get_scale_bounds(
-        QtCore.QPointF(100, 80)).boundingRect()
+    rect = item.get_scale_bounds(QtCore.QPointF(100, 80)).boundingRect()
     assert rect.topLeft().x() == 95
     assert rect.topLeft().y() == 75
     assert rect.bottomRight().x() == 105
@@ -240,8 +244,7 @@ def test_get_scale_bounds(view, item):
 
 def test_get_scale_bounds_with_margin(view, item):
     item.SELECT_RESIZE_SIZE = 10
-    rect = item.get_scale_bounds(
-        QtCore.QPointF(100, 80), margin=1).boundingRect()
+    rect = item.get_scale_bounds(QtCore.QPointF(100, 80), margin=1).boundingRect()
     assert rect.topLeft().x() == 94
     assert rect.topLeft().y() == 74
     assert rect.bottomRight().x() == 106
@@ -273,47 +276,50 @@ def test_rotate_bounds_topleft(view, item):
 def test_get_flip_bounds(view, item):
     item.SELECT_RESIZE_SIZE = 10
     item.SELECT_ROTATE_SIZE = 10
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         edges = item.get_flip_bounds()
-        assert edges[0]['rect'].topLeft() == QtCore.QPointF(5, -5)
-        assert edges[0]['rect'].bottomRight() == QtCore.QPointF(95, 5)
-        assert edges[0]['flip_v'] is True
-        assert edges[1]['rect'].topLeft() == QtCore.QPointF(5, 75)
-        assert edges[1]['rect'].bottomRight() == QtCore.QPointF(95, 85)
-        assert edges[1]['flip_v'] is True
-        assert edges[2]['rect'].topLeft() == QtCore.QPointF(-5, 5)
-        assert edges[2]['rect'].bottomRight() == QtCore.QPointF(5, 75)
-        assert edges[2]['flip_v'] is False
-        assert edges[3]['rect'].topLeft() == QtCore.QPointF(95, 5)
-        assert edges[3]['rect'].bottomRight() == QtCore.QPointF(105, 75)
-        assert edges[3]['flip_v'] is False
+        assert edges[0]["rect"].topLeft() == QtCore.QPointF(5, -5)
+        assert edges[0]["rect"].bottomRight() == QtCore.QPointF(95, 5)
+        assert edges[0]["flip_v"] is True
+        assert edges[1]["rect"].topLeft() == QtCore.QPointF(5, 75)
+        assert edges[1]["rect"].bottomRight() == QtCore.QPointF(95, 85)
+        assert edges[1]["flip_v"] is True
+        assert edges[2]["rect"].topLeft() == QtCore.QPointF(-5, 5)
+        assert edges[2]["rect"].bottomRight() == QtCore.QPointF(5, 75)
+        assert edges[2]["flip_v"] is False
+        assert edges[3]["rect"].topLeft() == QtCore.QPointF(95, 5)
+        assert edges[3]["rect"].bottomRight() == QtCore.QPointF(105, 75)
+        assert edges[3]["flip_v"] is False
 
 
 def test_get_flip_bounds_cropped_item(view, item):
     item.SELECT_RESIZE_SIZE = 10
     item.SELECT_ROTATE_SIZE = 10
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         edges = item.get_flip_bounds()
-        assert edges[0]['rect'].topLeft() == QtCore.QPointF(10, 0)
-        assert edges[0]['rect'].bottomRight() == QtCore.QPointF(100, 10)
-        assert edges[0]['flip_v'] is True
-        assert edges[1]['rect'].topLeft() == QtCore.QPointF(10, 80)
-        assert edges[1]['rect'].bottomRight() == QtCore.QPointF(100, 90)
-        assert edges[1]['flip_v'] is True
-        assert edges[2]['rect'].topLeft() == QtCore.QPointF(0, 10)
-        assert edges[2]['rect'].bottomRight() == QtCore.QPointF(10, 80)
-        assert edges[2]['flip_v'] is False
-        assert edges[3]['rect'].topLeft() == QtCore.QPointF(100, 10)
-        assert edges[3]['rect'].bottomRight() == QtCore.QPointF(110, 80)
-        assert edges[3]['flip_v'] is False
+        assert edges[0]["rect"].topLeft() == QtCore.QPointF(10, 0)
+        assert edges[0]["rect"].bottomRight() == QtCore.QPointF(100, 10)
+        assert edges[0]["flip_v"] is True
+        assert edges[1]["rect"].topLeft() == QtCore.QPointF(10, 80)
+        assert edges[1]["rect"].bottomRight() == QtCore.QPointF(100, 90)
+        assert edges[1]["flip_v"] is True
+        assert edges[2]["rect"].topLeft() == QtCore.QPointF(0, 10)
+        assert edges[2]["rect"].bottomRight() == QtCore.QPointF(10, 80)
+        assert edges[2]["flip_v"] is False
+        assert edges[3]["rect"].topLeft() == QtCore.QPointF(100, 10)
+        assert edges[3]["rect"].bottomRight() == QtCore.QPointF(110, 80)
+        assert edges[3]["flip_v"] is False
 
 
 def test_bounding_rect_when_not_selected(view, item):
     item.setSelected(False)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         rect = item.boundingRect()
         assert rect.topLeft().x() == 0
         assert rect.topLeft().y() == 0
@@ -325,8 +331,9 @@ def test_bounding_rect_when_selected(view, item):
     item.SELECT_RESIZE_SIZE = 10
     item.SELECT_ROTATE_SIZE = 10
     item.setSelected(True)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         rect = item.boundingRect()
         assert rect.topLeft().x() == -15
         assert rect.topLeft().y() == -15
@@ -334,11 +341,12 @@ def test_bounding_rect_when_selected(view, item):
         assert rect.bottomRight().y() == 95
 
 
-def test_shape_when_not_selected(view, item):
-    view.scene.addItem(item)
+def test_shape_when_not_selected(scene, item):
+    scene.addItem(item)
     item.setSelected(False)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         shape = item.shape().boundingRect()
         assert shape.topLeft().x() == 0
         assert shape.topLeft().y() == 0
@@ -346,16 +354,17 @@ def test_shape_when_not_selected(view, item):
         assert shape.bottomRight().y() == 80
 
 
-def test_shape_when_selected_single(view, item):
-    view.scene.addItem(item)
+def test_shape_when_selected_single(scene, item):
+    scene.addItem(item)
     item.SELECT_RESIZE_SIZE = 10
     item.SELECT_ROTATE_SIZE = 10
     item.setSelected(True)
     path = QtGui.QPainterPath()
     path.addRect(QtCore.QRectF(0, 0, 100, 80))
 
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         shape = item.shape().boundingRect()
         assert shape.topLeft().x() == -15
         assert shape.topLeft().y() == -15
@@ -363,17 +372,18 @@ def test_shape_when_selected_single(view, item):
         assert shape.bottomRight().y() == 95
 
 
-def test_shape_when_selected_multi(view, item):
-    view.scene.addItem(item)
+def test_shape_when_selected_multi(scene, item):
+    scene.addItem(item)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item.SELECT_RESIZE_SIZE = 10
     item.SELECT_ROTATE_SIZE = 10
     item.setSelected(True)
 
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         shape = item.shape().boundingRect()
         assert shape.topLeft().x() == 0
         assert shape.topLeft().y() == 0
@@ -387,8 +397,9 @@ def test_get_scale_factor_bottomright(view, item):
     item.scale_orig_factor = 1
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(20, 90)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         assert item.get_scale_factor(event) == approx(1.5, 0.01)
 
 
@@ -398,8 +409,9 @@ def test_get_scale_factor_bottomright_cropped_item(view, item):
     item.scale_orig_factor = 1
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(25, 95)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         assert item.get_scale_factor(event) == approx(1.5, 0.01)
 
 
@@ -409,8 +421,9 @@ def test_get_scale_factor_topleft(view, item):
     item.scale_orig_factor = 0.5
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(-10, -60)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         assert item.get_scale_factor(event) == approx(2, 0.01)
 
 
@@ -420,163 +433,185 @@ def test_get_scale_factor_topleft_cropped_item(view, item):
     item.scale_orig_factor = 0.5
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(-5, -55)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         assert item.get_scale_factor(event) == approx(2, 0.01)
 
 
 def test_get_scale_anchor_topleft(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(0, 0))
         assert anchor.x() == 100
         assert anchor.y() == 80
 
 
 def test_get_scale_anchor_topleft_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(5, 5))
         assert anchor.x() == 105
         assert anchor.y() == 85
 
 
 def test_get_scale_anchor_bottomright(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(100, 80))
         assert anchor.x() == 0
         assert anchor.y() == 0
 
 
 def test_get_scale_anchor_bottomright_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(105, 85))
         assert anchor.x() == 5
         assert anchor.y() == 5
 
 
 def test_get_scale_anchor_topright(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(100, 0))
         assert anchor.x() == 0
         assert anchor.y() == 80
 
 
 def test_get_scale_anchor_topright_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(105, 5))
         assert anchor.x() == 5
         assert anchor.y() == 85
 
 
 def test_get_scale_anchor_bottomleft(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(0, 80))
         assert anchor.x() == 100
         assert anchor.y() == 0
 
 
 def test_get_scale_anchor_bottomleft_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         anchor = item.get_scale_anchor(QtCore.QPointF(5, 85))
         assert anchor.x() == 105
         assert anchor.y() == 5
 
 
 def test_get_corner_direction_topleft(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(0, 0)) == QtCore.QPointF(-1, -1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(0, 0)) == QtCore.QPointF(-1, -1)
 
 
 def test_get_corner_direction_topleft_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(5, 5)) == QtCore.QPointF(-1, -1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(5, 5)) == QtCore.QPointF(-1, -1)
 
 
 def test_get_corner_direction_bottomright(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(100, 80)) == QtCore.QPointF(1, 1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(100, 80)) == QtCore.QPointF(
+            1, 1
+        )
 
 
 def test_get_corner_direction_bottomright_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(105, 85)) == QtCore.QPointF(1, 1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(105, 85)) == QtCore.QPointF(
+            1, 1
+        )
 
 
 def test_get_corner_direction_topright(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(100, 0)) == QtCore.QPointF(1, -1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(100, 0)) == QtCore.QPointF(
+            1, -1
+        )
 
 
 def test_get_corner_direction_topright_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(105, 5)) == QtCore.QPointF(1, -1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(105, 5)) == QtCore.QPointF(
+            1, -1
+        )
 
 
 def test_get_corner_direction_bottomleft(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(0, 80)) == QtCore.QPointF(-1, 1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(0, 80)) == QtCore.QPointF(-1, 1)
 
 
 def test_get_corner_direction_bottomleft_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
-        assert item.get_corner_direction(
-            QtCore.QPointF(5, 85)) == QtCore.QPointF(-1, 1)
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
+        assert item.get_corner_direction(QtCore.QPointF(5, 85)) == QtCore.QPointF(-1, 1)
 
 
 def test_get_direction_from_center_topleft(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         direction = item.get_direction_from_center(QtCore.QPointF(0, -10))
         assert direction == approx(QtCore.QPointF(-1, -1) / math.sqrt(2))
 
 
 def test_get_direction_from_center_topleft_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         direction = item.get_direction_from_center(QtCore.QPointF(5, -5))
         assert direction == approx(QtCore.QPointF(-1, -1) / math.sqrt(2))
 
 
 def test_get_direction_from_center_bottomright(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         direction = item.get_direction_from_center(QtCore.QPointF(100, 90))
         assert direction == approx(QtCore.QPointF(1, 1) / math.sqrt(2))
 
 
 def test_get_direction_from_center_bottomright_cropped_item(view, item):
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(5, 5, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(5, 5, 100, 80)
+    ):
         direction = item.get_direction_from_center(QtCore.QPointF(105, 95))
         assert direction == approx(QtCore.QPointF(1, 1) / math.sqrt(2))
 
 
 def test_get_direction_from_center_bottomright_when_rotated_180(view, item):
     item.setRotation(180, QtCore.QPointF(50, 40))
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         direction = item.get_direction_from_center(QtCore.QPointF(100, 90))
         assert direction == approx(QtCore.QPointF(1, 1) / math.sqrt(2))
 
@@ -601,68 +636,73 @@ def test_get_rotate_delta_snaps(view, item):
 
 def test_edge_flips_v_when_item_horizontal(view, item):
     item.setRotation(20)
-    assert item.get_edge_flips_v({'flip_v': True}) is True
+    assert item.get_edge_flips_v({"flip_v": True}) is True
 
 
 def test_edge_flips_v_when_item_horizontal_upside_down(view, item):
     item.setRotation(200)
-    assert item.get_edge_flips_v({'flip_v': True}) is True
+    assert item.get_edge_flips_v({"flip_v": True}) is True
 
 
 def test_edge_flips_v_when_item_vertical_cw(view, item):
     item.setRotation(80)
-    assert item.get_edge_flips_v({'flip_v': True}) is False
+    assert item.get_edge_flips_v({"flip_v": True}) is False
 
 
 def test_edge_flips_v_when_item_vertical_ccw(view, item):
     item.setRotation(120)
-    assert item.get_edge_flips_v({'flip_v': True}) is False
+    assert item.get_edge_flips_v({"flip_v": True}) is False
 
 
-def test_hover_move_event_no_selection(view, item):
-    view.scene.addItem(item)
+def test_hover_move_event_no_selection(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(0, 0)
     item.set_cursor = MagicMock()
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         item.set_cursor.assert_not_called()
 
 
-def test_hover_move_event_small_item_inside_handle_free_center(view, item):
-    view.scene.addItem(item)
+def test_hover_move_event_small_item_inside_handle_free_center(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(10, 10)
     item.unset_cursor = MagicMock()
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 20, 20)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 20, 20)
+    ):
         item.hoverMoveEvent(event)
         item.unset_cursor.assert_called_once_with()
 
 
-@mark.parametrize('pos,flipped,rotation, expected',
-                  [((0, 0), False, 0, 'SizeFDiagCursor'),
-                   ((100, 80), False, 0, 'SizeFDiagCursor'),
-                   ((100, 0), False, 0, 'SizeBDiagCursor'),
-                   ((0, 0), False, 90, 'SizeBDiagCursor'),
-                   ((0, 0), False, 45, 'SizeVerCursor'),
-                   ((0, 0), False, 135, 'SizeHorCursor'),
-                   ((0, 80), False, 45, 'SizeHorCursor'),
-                   ((0, 80), False, 90, 'SizeFDiagCursor'),
-                   ((0, 80), False, 135, 'SizeVerCursor'),
-                   ((0, 80), True, 0, 'SizeFDiagCursor'),
-                   ((100, 0), True, 0, 'SizeFDiagCursor'),
-                   ((100, 80), True, 0, 'SizeBDiagCursor'),
-                   ((0, 80), True, 90, 'SizeBDiagCursor'),
-                   ((0, 80), True, 45, 'SizeHorCursor'),
-                   ((0, 0), True, 135, 'SizeHorCursor'),
-                   ((0, 0), True, 45, 'SizeVerCursor'),
-                   ((0, 0), True, 90, 'SizeFDiagCursor'),
-                   ((0, 0), True, 135, 'SizeHorCursor')])
-def test_hover_move_event_scale(
-        pos, flipped, rotation, expected, view, item):
+@mark.parametrize(
+    "pos,flipped,rotation, expected",
+    [
+        ((0, 0), False, 0, "SizeFDiagCursor"),
+        ((100, 80), False, 0, "SizeFDiagCursor"),
+        ((100, 0), False, 0, "SizeBDiagCursor"),
+        ((0, 0), False, 90, "SizeBDiagCursor"),
+        ((0, 0), False, 45, "SizeVerCursor"),
+        ((0, 0), False, 135, "SizeHorCursor"),
+        ((0, 80), False, 45, "SizeHorCursor"),
+        ((0, 80), False, 90, "SizeFDiagCursor"),
+        ((0, 80), False, 135, "SizeVerCursor"),
+        ((0, 80), True, 0, "SizeFDiagCursor"),
+        ((100, 0), True, 0, "SizeFDiagCursor"),
+        ((100, 80), True, 0, "SizeBDiagCursor"),
+        ((0, 80), True, 90, "SizeBDiagCursor"),
+        ((0, 80), True, 45, "SizeHorCursor"),
+        ((0, 0), True, 135, "SizeHorCursor"),
+        ((0, 0), True, 45, "SizeVerCursor"),
+        ((0, 0), True, 90, "SizeFDiagCursor"),
+        ((0, 0), True, 135, "SizeHorCursor"),
+    ],
+)
+def test_hover_move_event_scale(pos, flipped, rotation, expected, view, item):
     view.scene.addItem(item)
     item.setSelected(True)
     if flipped:
@@ -670,8 +710,9 @@ def test_hover_move_event_scale(
     item.setRotation(rotation)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(*pos)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == getattr(Qt.CursorShape, expected)
 
@@ -681,8 +722,9 @@ def test_hover_move_event_scale_bottomright_very_wide_item(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(1000, 100)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 1000, 100)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 1000, 100)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == Qt.CursorShape.SizeFDiagCursor
 
@@ -692,8 +734,9 @@ def test_hover_move_event_rotate(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(115, 95)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_rotate
 
@@ -703,8 +746,9 @@ def test_hover_flip_event_top_edge(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(50, 0)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_v
 
@@ -714,8 +758,9 @@ def test_hover_flip_event_bottom_edge(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(50, 80)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_v
 
@@ -725,8 +770,9 @@ def test_hover_flip_event_left_edge(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(0, 50)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_h
 
@@ -736,8 +782,9 @@ def test_hover_flip_event_right_edge(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(100, 50)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_h
 
@@ -748,8 +795,9 @@ def test_hover_flip_event_top_edge_rotated_90(view, item):
     item.setRotation(90)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(50, 0)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_h
 
@@ -760,8 +808,9 @@ def test_hover_flip_event_left_edge_when_rotated_90(view, item):
     item.setSelected(True)
     item.setRotation(90)
     event.pos.return_value = QtCore.QPointF(0, 50)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == BeeAssets().cursor_flip_v
 
@@ -771,14 +820,15 @@ def test_hover_move_event_not_in_handles(view, item):
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(50, 50)
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 1000, 800)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 1000, 800)
+    ):
         item.hoverMoveEvent(event)
         assert view.viewport().cursor() == Qt.CursorShape.ArrowCursor
 
 
-def test_hover_leave_event(view, item):
-    view.scene.addItem(item)
+def test_hover_leave_event(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     item.setSelected(True)
     item.unset_cursor = MagicMock()
@@ -786,43 +836,46 @@ def test_hover_leave_event(view, item):
     item.unset_cursor.assert_called_once_with()
 
 
-def test_mouse_press_event_just_selected(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_just_selected(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(0, 0)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent') as m:
-        with patch.object(item, 'bounding_rect_unselected',
-                          return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent") as m:
+        with patch.object(
+            item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+        ):
             item.mousePressEvent(event)
     event.accept.assert_not_called()
     m.assert_called_once_with(event)
 
 
-def test_mouse_press_event_small_item_inside_handle_free_center(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_small_item_inside_handle_free_center(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(10, 10)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent') as m:
-        with patch.object(item, 'bounding_rect_unselected',
-                          return_value=QtCore.QRectF(0, 0, 20, 20)):
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent") as m:
+        with patch.object(
+            item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 20, 20)
+        ):
             item.mousePressEvent(event)
 
     event.accept.assert_not_called()
     m.assert_called_once_with(event)
 
 
-def test_mouse_press_event_topleft_scale(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_topleft_scale(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(2, 2)
     event.scenePos.return_value = QtCore.QPointF(-1, -1)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.mousePressEvent(event)
         assert item.active_mode == item.SCALE_MODE
         assert item.event_start == QtCore.QPointF(-1, -1)
@@ -832,15 +885,16 @@ def test_mouse_press_event_topleft_scale(view, item):
         event.accept.assert_called_once_with()
 
 
-def test_mouse_press_event_bottomright_scale(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_bottomright_scale(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(99, 79)
     event.scenePos.return_value = QtCore.QPointF(101, 81)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.mousePressEvent(event)
         assert item.active_mode == item.SCALE_MODE
         assert item.event_start == QtCore.QPointF(101, 81)
@@ -850,16 +904,17 @@ def test_mouse_press_event_bottomright_scale(view, item):
         event.accept.assert_called_once_with()
 
 
-def test_mouse_press_event_rotate(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_rotate(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(111, 91)
     event.scenePos.return_value = QtCore.QPointF(66, 99)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent'):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent"):
             item.mousePressEvent(event)
             assert item.active_mode == item.ROTATE_MODE
             assert item.event_anchor == QtCore.QPointF(50, 40)
@@ -867,18 +922,19 @@ def test_mouse_press_event_rotate(view, item):
             event.accept.assert_called_once_with()
 
 
-def test_mouse_press_event_flip(view, item):
-    view.scene.addItem(item)
+def test_mouse_press_event_flip(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(0, 40)
     event.button.return_value = Qt.MouseButton.LeftButton
-    view.scene.undo_stack = MagicMock(push=MagicMock())
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
-        with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent'):
+    scene.undo_stack = MagicMock(push=MagicMock())
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
+        with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent"):
             item.mousePressEvent(event)
-    args = view.scene.undo_stack.push.call_args_list[0][0]
+    args = scene.undo_stack.push.call_args_list[0][0]
     cmd = args[0]
     isinstance(cmd, commands.FlipItems)
     assert cmd.items == [item]
@@ -895,7 +951,7 @@ def test_mouse_press_event_not_in_handles(view, item):
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(50, 40)
     event.button.return_value = Qt.MouseButton.LeftButton
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mousePressEvent") as m:
         item.mousePressEvent(event)
         m.assert_called_once_with(event)
         assert item.active_mode is None
@@ -908,7 +964,7 @@ def test_mouse_move_event_when_no_action_reset_prev_transform(view, item):
     event = MagicMock()
     item.event_start = QtCore.QPointF(10, 10)
     event.scenePos.return_value = QtCore.QPointF(50, 40)
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent") as m:
         item.mouseMoveEvent(event)
         m.assert_called_once_with(event)
         view.reset_previous_transform.assert_called_once()
@@ -921,15 +977,15 @@ def test_mouse_move_event_when_no_action_doesnt_reset_prev_transf(view, item):
     event = MagicMock()
     item.event_start = QtCore.QPointF(10, 10)
     event.scenePos.return_value = QtCore.QPointF(11, 11)
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent") as m:
         item.mouseMoveEvent(event)
         m.assert_called_once_with(event)
         view.reset_previous_transform.assert_not_called()
         event.accept.assert_not_called()
 
 
-def test_mouse_move_event_when_scale_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_move_event_when_scale_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(20, 90)
     item.active_mode = item.SCALE_MODE
@@ -938,17 +994,18 @@ def test_mouse_move_event_when_scale_action(view, item):
     item.event_start = QtCore.QPointF(10, 10)
     item.scale_orig_factor = 1
 
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent') as m:
-        with patch.object(item, 'bounding_rect_unselected',
-                          return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent") as m:
+        with patch.object(
+            item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+        ):
             item.mouseMoveEvent(event)
             m.assert_not_called()
             assert item.scale() == approx(1.5, 0.01)
             event.accept.assert_called_once_with()
 
 
-def test_mouse_move_event_when_rotate_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_move_event_when_rotate_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(15, 25)
     item.event_start = QtCore.QPointF(10, 10)
@@ -956,40 +1013,39 @@ def test_mouse_move_event_when_rotate_action(view, item):
     item.rotate_orig_degrees = 0
     item.rotate_start_angle = -3
     item.event_anchor = QtCore.QPointF(10, 20)
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent") as m:
         item.mouseMoveEvent(event)
         m.assert_not_called()
     assert item.rotation() == 318
     event.accept.assert_called_once_with()
 
 
-def test_mouse_move_event_when_flip_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_move_event_when_flip_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(15, 25)
     item.event_start = QtCore.QPointF(10, 10)
     item.active_mode = item.FLIP_MODE
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseMoveEvent") as m:
         item.mouseMoveEvent(event)
         m.assert_not_called()
         event.accept.assert_called_once_with()
 
 
-def test_mouse_release_event_when_no_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_no_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     item.active_mode = item.FLIP_MODE
     event.pos.return_value = QtCore.QPointF(-100, -100)
-    with patch('PyQt6.QtWidgets.QGraphicsPixmapItem'
-               '.mouseReleaseEvent') as m:
+    with patch("PyQt6.QtWidgets.QGraphicsPixmapItem.mouseReleaseEvent") as m:
         item.mouseReleaseEvent(event)
         m.assert_called_once_with(event)
         item.active_mode is None
         event.accept.assert_not_called()
 
 
-def test_mouse_release_event_when_scale_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_scale_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(20, 90)
     item.active_mode = item.SCALE_MODE
@@ -997,13 +1053,14 @@ def test_mouse_release_event_when_scale_action(view, item):
     item.event_anchor = QtCore.QPointF(100, 80)
     item.event_start = QtCore.QPointF(10, 10)
     item.scale_orig_factor = 1
-    view.scene.undo_stack = MagicMock(push=MagicMock())
+    scene.undo_stack = MagicMock(push=MagicMock())
 
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.mouseReleaseEvent(event)
-        view.scene.undo_stack.push.assert_called_once()
-        args = view.scene.undo_stack.push.call_args_list[0][0]
+        scene.undo_stack.push.assert_called_once()
+        args = scene.undo_stack.push.call_args_list[0][0]
         cmd = args[0]
         isinstance(cmd, commands.ScaleItemsBy)
         assert cmd.items == [item]
@@ -1014,8 +1071,8 @@ def test_mouse_release_event_when_scale_action(view, item):
         event.accept.assert_called_once_with()
 
 
-def test_mouse_release_event_when_scale_action_zero(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_scale_action_zero(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(20, 90)
     item.active_mode = item.SCALE_MODE
@@ -1023,29 +1080,30 @@ def test_mouse_release_event_when_scale_action_zero(view, item):
     item.event_anchor = QtCore.QPointF(100, 80)
     item.event_start = QtCore.QPointF(20, 90)
     item.scale_orig_factor = 1
-    view.scene.undo_stack = MagicMock(push=MagicMock())
+    scene.undo_stack = MagicMock(push=MagicMock())
 
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.mouseReleaseEvent(event)
-        view.scene.undo_stack.push.assert_not_called()
+        scene.undo_stack.push.assert_not_called()
         assert item.active_mode is None
         event.accept.assert_called_once_with()
 
 
-def test_mouse_release_event_when_rotate_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_rotate_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(15, 25)
     item.active_mode = item.ROTATE_MODE
     item.rotate_orig_degrees = 0
     item.rotate_start_angle = -3
     item.event_anchor = QtCore.QPointF(10, 20)
-    view.scene.undo_stack = MagicMock(push=MagicMock())
+    scene.undo_stack = MagicMock(push=MagicMock())
 
     item.mouseReleaseEvent(event)
-    view.scene.undo_stack.push.assert_called_once()
-    args = view.scene.undo_stack.push.call_args_list[0][0]
+    scene.undo_stack.push.assert_called_once()
+    args = scene.undo_stack.push.call_args_list[0][0]
     cmd = args[0]
     isinstance(cmd, commands.RotateItemsBy)
     assert cmd.items == [item]
@@ -1056,32 +1114,33 @@ def test_mouse_release_event_when_rotate_action(view, item):
     event.accept.assert_called_once_with()
 
 
-def test_mouse_release_event_when_rotate_action_zero(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_rotate_action_zero(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.scenePos.return_value = QtCore.QPointF(15, 25)
     item.active_mode = item.ROTATE_MODE
     item.rotate_orig_degrees = 0
     item.rotate_start_angle = -45
     item.event_anchor = QtCore.QPointF(10, 20)
-    view.scene.undo_stack = MagicMock(push=MagicMock())
+    scene.undo_stack = MagicMock(push=MagicMock())
 
     item.mouseReleaseEvent(event)
-    view.scene.undo_stack.push.assert_not_called()
+    scene.undo_stack.push.assert_not_called()
     assert item.active_mode is None
     event.accept.assert_called_once_with()
 
 
-def test_mouse_release_event_when_flip_action(view, item):
-    view.scene.addItem(item)
+def test_mouse_release_event_when_flip_action(scene, item):
+    scene.addItem(item)
     event = MagicMock()
     event.pos.return_value = QtCore.QPointF(0, 40)
     item.active_mode = item.FLIP_MODE
-    view.scene.undo_stack = MagicMock(push=MagicMock())
+    scene.undo_stack = MagicMock(push=MagicMock())
 
-    with patch.object(item, 'bounding_rect_unselected',
-                      return_value=QtCore.QRectF(0, 0, 100, 80)):
+    with patch.object(
+        item, "bounding_rect_unselected", return_value=QtCore.QRectF(0, 0, 100, 80)
+    ):
         item.mouseReleaseEvent(event)
-    view.scene.undo_stack.push.assert_not_called()
+    scene.undo_stack.push.assert_not_called()
     assert item.active_mode is None
     event.accept.assert_called_once_with()

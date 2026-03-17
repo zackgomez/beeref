@@ -427,7 +427,7 @@ def test_on_action_export_scene(
     view.on_action_export_scene()
     qtbot.waitUntil(lambda: view.on_export_finished.called is True)
     assert_io_result(view.on_export_finished, filename)
-    img = QtGui.QImage(filename)
+    img = QtGui.QImage(str(filename))
     assert img.size() == QtCore.QSize(100, 100)
 
 
@@ -448,8 +448,8 @@ def test_on_action_export_scene_no_file_extension(
 
     view.on_action_export_scene()
     qtbot.waitUntil(lambda: view.on_export_finished.called is True)
-    assert_io_result(view.on_export_finished, f"{filename}.png")
-    img = QtGui.QImage(f"{filename}.png")
+    assert_io_result(view.on_export_finished, filename.with_suffix(".png"))
+    img = QtGui.QImage(str(filename.with_suffix(".png")))
     assert img.size() == QtCore.QSize(100, 100)
 
 

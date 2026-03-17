@@ -12,33 +12,33 @@ from beeref.fileio.export import SceneToSVGExporter
 from beeref.types.snapshot import IOResult
 
 
-def test_scene_to_svg_exporter_get_user_input(view):
+def test_scene_to_svg_exporter_get_user_input(scene):
     item1 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(0, 0))
-    view.scene.addItem(item1)
+    scene.addItem(item1)
 
     item2 = BeePixmapItem(QtGui.QImage(100, 100, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(200, 0))
-    view.scene.addItem(item2)
+    scene.addItem(item2)
 
-    assert view.scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
-    exporter = SceneToSVGExporter(view.scene)
+    assert scene.sceneRect().size().toSize() == QtCore.QSize(300, 100)
+    exporter = SceneToSVGExporter(scene)
     value = exporter.get_user_input(None)
     assert value is True
     assert exporter.size == QtCore.QSize(318, 118)
 
 
-def test_scene_to_svg_exporter_render_pixmap_items(view):
+def test_scene_to_svg_exporter_render_pixmap_items(scene):
     item1 = BeePixmapItem(QtGui.QImage(100, 110, QtGui.QImage.Format.Format_RGB32))
     item1.setPos(QtCore.QPointF(20, 30))
-    view.scene.addItem(item1)
+    scene.addItem(item1)
 
     item2 = BeePixmapItem(QtGui.QImage(70, 77, QtGui.QImage.Format.Format_RGB32))
     item2.setPos(QtCore.QPointF(50, 50))
     item2.setZValue(-1)
-    view.scene.addItem(item2)
+    scene.addItem(item2)
 
-    exporter = SceneToSVGExporter(view.scene)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -72,12 +72,12 @@ def test_scene_to_svg_exporter_render_pixmap_items(view):
     assert element.get("opacity") == "1.0"
 
 
-def test_scene_to_svg_exporter_render_pixmap_with_crop(view):
+def test_scene_to_svg_exporter_render_pixmap_with_crop(scene):
     item = BeePixmapItem(QtGui.QImage(100, 110, QtGui.QImage.Format.Format_RGB32))
     item.setPos(QtCore.QPointF(20, 30))
     item.crop = QtCore.QRectF(20, 25, 30, 33)
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -93,12 +93,12 @@ def test_scene_to_svg_exporter_render_pixmap_with_crop(view):
     assert element.get("y") == "5.0"
 
 
-def test_scene_to_svg_exporter_render_pixmap_with_rotation(view):
+def test_scene_to_svg_exporter_render_pixmap_with_rotation(scene):
     item = BeePixmapItem(QtGui.QImage(100, 110, QtGui.QImage.Format.Format_RGB32))
     item.setPos(QtCore.QPointF(20, 30))
     item.setRotation(90)
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -112,12 +112,12 @@ def test_scene_to_svg_exporter_render_pixmap_with_rotation(view):
     assert element.get("y") == "5.0"
 
 
-def test_scene_to_svg_exporter_render_pixmap_with_opacity(view):
+def test_scene_to_svg_exporter_render_pixmap_with_opacity(scene):
     item = BeePixmapItem(QtGui.QImage(100, 110, QtGui.QImage.Format.Format_RGB32))
     item.setPos(QtCore.QPointF(20, 30))
     item.setOpacity(0.75)
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -129,12 +129,12 @@ def test_scene_to_svg_exporter_render_pixmap_with_opacity(view):
     assert element.get("opacity") == "0.75"
 
 
-def test_scene_to_svg_exporter_render_pixmap_with_flip(view):
+def test_scene_to_svg_exporter_render_pixmap_with_flip(scene):
     item = BeePixmapItem(QtGui.QImage(100, 110, QtGui.QImage.Format.Format_RGB32))
     item.setPos(QtCore.QPointF(20, 30))
     item.do_flip()
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -151,11 +151,11 @@ def test_scene_to_svg_exporter_render_pixmap_with_flip(view):
     assert element.get("y") == "5.0"
 
 
-def test_scene_to_svg_exporter_render_text(view):
+def test_scene_to_svg_exporter_render_text(scene):
     item = BeeTextItem("foo")
     item.setPos(QtCore.QPointF(20, 30))
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
     svg = exporter.render_to_svg()
@@ -172,14 +172,14 @@ def test_scene_to_svg_exporter_render_text(view):
     assert element.get("y") == "5.0"
 
 
-def test_scene_to_svg_exporter_export_when_file_not_writeable(view, tmp_path):
+def test_scene_to_svg_exporter_export_when_file_not_writeable(scene, tmp_path):
     filename = tmp_path / "foo.svg"
     with open(filename, "w") as f:
         f.write("foo")
     os.chmod(filename, stat.S_IREAD)
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
 
     with pytest.raises(BeeFileIOError) as e:
@@ -187,11 +187,11 @@ def test_scene_to_svg_exporter_export_when_file_not_writeable(view, tmp_path):
         assert e.filename == filename
 
 
-def test_scene_to_svg_exporter_render_with_worker(view):
+def test_scene_to_svg_exporter_render_with_worker(scene):
     item = BeeTextItem("foo")
     item.setPos(QtCore.QPointF(20, 30))
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
 
@@ -201,11 +201,11 @@ def test_scene_to_svg_exporter_render_with_worker(view):
     worker.progress.emit.assert_called_once_with(0)
 
 
-def test_scene_to_svg_exporter_render_with_worker_canceled(view):
+def test_scene_to_svg_exporter_render_with_worker_canceled(scene):
     item = BeeTextItem("foo")
     item.setPos(QtCore.QPointF(20, 30))
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(200, 400)
     exporter.margin = 5
 
@@ -214,11 +214,11 @@ def test_scene_to_svg_exporter_render_with_worker_canceled(view):
     assert svg is None
 
 
-def test_scene_to_svg_exporter_export_writes_svg(view, tmp_path):
+def test_scene_to_svg_exporter_export_writes_svg(scene, tmp_path):
     filename = tmp_path / "foo.svg"
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     exporter.export(filename)
 
@@ -226,11 +226,11 @@ def test_scene_to_svg_exporter_export_writes_svg(view, tmp_path):
         assert f.read().startswith(b"<?xml")
 
 
-def test_scene_to_svg_exporter_export_with_worker(view, tmp_path):
+def test_scene_to_svg_exporter_export_with_worker(scene, tmp_path):
     filename = tmp_path / "foo.svg"
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=False)
     exporter.export(filename, worker)
@@ -244,11 +244,11 @@ def test_scene_to_svg_exporter_export_with_worker(view, tmp_path):
         assert f.read().startswith(b"<?xml")
 
 
-def test_scene_to_svg_exporter_export_with_worker_canceled(view, tmp_path):
+def test_scene_to_svg_exporter_export_with_worker_canceled(scene, tmp_path):
     filename = tmp_path / "foo.svg"
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=True)
     exporter.export(filename, worker)
@@ -262,15 +262,15 @@ def test_scene_to_svg_exporter_export_with_worker_canceled(view, tmp_path):
 
 
 def test_scene_to_svg_exporter_export_when_file_not_writeable_with_worker(
-    view, tmp_path
+    scene, tmp_path
 ):
     filename = tmp_path / "foo.svg"
     with open(filename, "w") as f:
         f.write("foo")
     os.chmod(filename, stat.S_IREAD)
     item = BeeTextItem("foo")
-    view.scene.addItem(item)
-    exporter = SceneToSVGExporter(view.scene)
+    scene.addItem(item)
+    exporter = SceneToSVGExporter(scene)
     exporter.size = QtCore.QSize(100, 120)
     worker = MagicMock(canceled=False)
 

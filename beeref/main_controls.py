@@ -125,7 +125,7 @@ class MainControlsMixin(_MainControlsBase):
                     local_path = Path(url.toLocalFile())
                     if fileio.is_bee_file(local_path):
                         target.open_from_file(local_path)
-                    return
+                        return
             target.do_insert_images(mimedata.urls(), pos)
         elif mimedata.hasImage():
             img = QtGui.QImage(mimedata.imageData())

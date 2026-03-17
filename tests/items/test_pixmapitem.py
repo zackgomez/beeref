@@ -222,41 +222,41 @@ def test_pixmap_from_bytes(qapp, item, imgfilename3x3):
     assert item.crop == QtCore.QRectF(0, 0, 3, 3)
 
 
-def test_has_selection_outline_when_not_selected(view, item):
-    view.scene.addItem(item)
+def test_has_selection_outline_when_not_selected(scene, item):
+    scene.addItem(item)
     item.setSelected(False)
     item.has_selection_outline() is False
 
 
-def test_has_selection_outline_when_selected(view, item):
-    view.scene.addItem(item)
+def test_has_selection_outline_when_selected(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item.has_selection_outline() is True
 
 
-def test_has_selection_handles_when_not_selected(view, item):
-    view.scene.addItem(item)
+def test_has_selection_handles_when_not_selected(scene, item):
+    scene.addItem(item)
     item.setSelected(False)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(False)
     item.has_selection_handles() is False
 
 
-def test_has_selection_handles_when_selected_single(view, item):
-    view.scene.addItem(item)
+def test_has_selection_handles_when_selected_single(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(False)
     item.has_selection_handles() is True
 
 
-def test_has_selection_handles_when_selected_multi(view, item):
-    view.scene.addItem(item)
+def test_has_selection_handles_when_selected_multi(scene, item):
+    scene.addItem(item)
     item.setSelected(True)
     item2 = BeePixmapItem(QtGui.QImage())
-    view.scene.addItem(item2)
+    scene.addItem(item2)
     item2.setSelected(True)
     item.has_selection_handles() is False
 
@@ -466,8 +466,8 @@ def test_paint_when_crop_mode(qapp, item):
     painter.drawPixmap.assert_called_with(0, 0, item.pixmap())
 
 
-def test_enter_crop_mode(view, item):
-    view.scene.addItem(item)
+def test_enter_crop_mode(scene, item):
+    scene.addItem(item)
     item.crop = QtCore.QRectF(10, 20, 30, 40)
     item.update = MagicMock()
     item.prepareGeometryChange = MagicMock()
@@ -481,11 +481,11 @@ def test_enter_crop_mode(view, item):
     item.update.assert_called_once_with()
     item.prepareGeometryChange.assert_called_once_with()
     item.grabKeyboard.assert_called_once_with()
-    assert view.scene.crop_item == item
+    assert scene.crop_item == item
 
 
-def test_exit_crop_mode_confirmed(view, item):
-    view.scene.addItem(item)
+def test_exit_crop_mode_confirmed(scene, item):
+    scene.addItem(item)
     item.update = MagicMock()
     item.prepareGeometryChange = MagicMock()
     item.ungrabKeyboard = MagicMock()
@@ -504,23 +504,23 @@ def test_exit_crop_mode_confirmed(view, item):
     item.update.assert_called()
     item.prepareGeometryChange.assert_called()
     item.ungrabKeyboard.assert_called_once_with()
-    assert view.scene.crop_item is None
-    view.scene.undo_stack.canUndo() is True
+    assert scene.crop_item is None
+    scene.undo_stack.canUndo() is True
 
 
-def test_exit_crop_mode_confirmed_no_change(view, item):
-    view.scene.addItem(item)
+def test_exit_crop_mode_confirmed_no_change(scene, item):
+    scene.addItem(item)
     item.crop = QtCore.QRectF(0, 0, 100, 80)
     item.crop_temp = QtCore.QRectF(0, 0, 100, 80)
     item.crop_mode = True
 
     item.exit_crop_mode(confirm=True)
     assert item.crop == QtCore.QRectF(0, 0, 100, 80)
-    view.scene.undo_stack.canUndo() is False
+    scene.undo_stack.canUndo() is False
 
 
-def test_exit_crop_mode_not_confirmed(view, item):
-    view.scene.addItem(item)
+def test_exit_crop_mode_not_confirmed(scene, item):
+    scene.addItem(item)
     item.update = MagicMock()
     item.prepareGeometryChange = MagicMock()
     item.ungrabKeyboard = MagicMock()
@@ -539,8 +539,8 @@ def test_exit_crop_mode_not_confirmed(view, item):
     item.update.assert_called()
     item.prepareGeometryChange.assert_called()
     item.ungrabKeyboard.assert_called_once_with()
-    assert view.scene.crop_item is None
-    view.scene.undo_stack.canUndo() is False
+    assert scene.crop_item is None
+    scene.undo_stack.canUndo() is False
 
 
 @patch("PyQt6.QtWidgets.QGraphicsPixmapItem.keyPressEvent")
@@ -826,28 +826,28 @@ def test_mouse_release_event_when_not_crop_mode(mouse_mock, qapp, item):
     mouse_mock.assert_called_once_with(event)
 
 
-def test_sample_color_at_returns_color(qapp, view):
+def test_sample_color_at_returns_color(qapp, scene):
     color = QtGui.QColor(255, 0, 0, 3)
     img = QtGui.QImage(10, 10, QtGui.QImage.Format.Format_ARGB32)
     img.fill(color)
     item = BeePixmapItem(img, "foo.png")
-    view.scene.addItem(item)
+    scene.addItem(item)
     assert item.sample_color_at(QtCore.QPointF(2, 2)) == color
 
 
-def test_sample_color_at_returns_none_when_fully_transparent(qapp, view):
+def test_sample_color_at_returns_none_when_fully_transparent(qapp, scene):
     color = QtGui.QColor(255, 0, 0, 0)
     img = QtGui.QImage(10, 10, QtGui.QImage.Format.Format_ARGB32)
     img.fill(color)
     item = BeePixmapItem(img, "foo.png")
-    view.scene.addItem(item)
+    scene.addItem(item)
     assert item.sample_color_at(QtCore.QPointF(2, 2)) is None
 
 
-def test_sample_color_at_returns_none_when_transparent(qapp, view):
+def test_sample_color_at_returns_none_when_transparent(qapp, scene):
     color = QtGui.QColor(255, 0, 0, 0)
     img = QtGui.QImage(10, 10, QtGui.QImage.Format.Format_ARGB32)
     img.fill(color)
     item = BeePixmapItem(img, "foo.png")
-    view.scene.addItem(item)
+    scene.addItem(item)
     assert item.sample_color_at(QtCore.QPointF(2, 2)) is None

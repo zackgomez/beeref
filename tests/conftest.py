@@ -1,4 +1,5 @@
 import os.path
+from pathlib import Path
 
 import pytest
 import uuid
@@ -85,8 +86,7 @@ def view(main_window):
 
 @pytest.fixture
 def imgfilename3x3():
-    root = os.path.dirname(__file__)
-    yield os.path.join(root, "assets", "test3x3.png")
+    yield str(Path(__file__).parent / "assets" / "test3x3.png")
 
 
 @pytest.fixture
