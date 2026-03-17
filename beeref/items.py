@@ -230,7 +230,6 @@ class BeePixmapItem(BeeItemMixin, QtWidgets.QGraphicsPixmapItem):
         if "crop" in data:
             item.crop = QtCore.QRectF(*data["crop"])
         item.setOpacity(data.get("opacity", 1))
-        item._blob_saved = True
         return item
 
     @classmethod

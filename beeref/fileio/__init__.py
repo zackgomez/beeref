@@ -16,6 +16,9 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
+import tempfile
 from typing import TYPE_CHECKING
 
 from PyQt6 import QtCore
@@ -83,20 +86,53 @@ def load_bee(
 def save_bee(
     filename: str,
     snapshots: list[ItemSnapshot],
-    create_new: bool = False,
+    swp_path: str,
     worker: ThreadedIO | None = None,
 ) -> None:
-    """Save BeeRef native file."""
+    """Save BeeRef native file via .swp drain + copy + compact.
+
+    1. Final drain to .swp (no deletes, no VACUUM)
+    2. Copy .swp to temp file next to target
+    3. Compact the copy (delete stale rows, VACUUM)
+    4. Atomic replace target .bee
+    """
     logger.info(f"Saving to file {filename}...")
-    logger.debug(f"Create new: {create_new}")
+    temp_path = None
     try:
-        io = SQLiteIO(filename, create_new=create_new, worker=worker)
-        newly_saved = io.write(snapshots, compact=True)
-    except BeeFileIOError as e:
+        # 1. Final drain to .swp
+        drain_io = SQLiteIO(swp_path, worker=worker)
+        newly_saved = drain_io.write(snapshots, compact=False)
+        drain_io._close_connection()
+
+        # 2. Copy .swp to temp file next to target
+        target_dir = os.path.dirname(os.path.abspath(filename))
+        tf = tempfile.NamedTemporaryFile(dir=target_dir, suffix=".bee", delete=False)
+        temp_path = tf.name
+        tf.close()
+        shutil.copyfile(swp_path, temp_path)
+
+        # 3. Compact the copy
+        live_ids = {snap.save_id for snap in snapshots}
+        compact_io = SQLiteIO(temp_path)
+        existing_ids = {row[0] for row in compact_io.fetchall("SELECT id FROM items")}
+        stale_ids = existing_ids - live_ids
+        if stale_ids:
+            compact_io.delete_items(stale_ids)
+        compact_io.ex("VACUUM")
+        compact_io.connection.commit()
+        compact_io._close_connection()
+
+        # 4. Atomic replace
+        os.replace(temp_path, filename)
+        temp_path = None
+    except Exception as e:
         logger.exception(f"Failed to save {filename}")
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
         if worker:
             worker.finished.emit(SaveResult(filename=filename, errors=[str(e)]))
         return
+
     logger.info("End save")
     if worker:
         worker.finished.emit(

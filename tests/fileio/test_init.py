@@ -2,20 +2,25 @@ import os.path
 import tempfile
 from unittest.mock import MagicMock, patch
 
-from PyQt6 import QtCore
+from PyQt6 import QtCore, QtGui
 
 from beeref import fileio
 from beeref import commands
 from beeref.fileio.snapshot import IOResult
+from beeref.items import BeePixmapItem
 from ..utils import queue2list
 
 
-@patch("beeref.fileio.sql.SQLiteIO.write")
-def test_save_bee_create_new_false(write_mock):
+def test_save_bee_via_swp(view, imgfilename3x3):
+    item = BeePixmapItem(QtGui.QImage(imgfilename3x3))
+    view.scene.addItem(item)
+    snapshots = view.scene.snapshot_for_save()
+    swp_path = view.scene._scratch_file
+    assert swp_path is not None
     with tempfile.TemporaryDirectory() as dirname:
         fname = os.path.join(dirname, "test.bee")
-        fileio.save_bee(fname, "myscene", create_new=False)
-        write_mock.assert_called_once()
+        fileio.save_bee(fname, snapshots, swp_path)
+        assert os.path.exists(fname)
 
 
 @patch("beeref.fileio.sql.SQLiteIO.read")

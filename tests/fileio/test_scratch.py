@@ -3,6 +3,7 @@ import sqlite3
 import tempfile
 from unittest.mock import MagicMock
 
+from beeref.fileio.schema import APPLICATION_ID, USER_VERSION
 from beeref.fileio.scratch import (
     create_scratch_file,
     delete_scratch_file,
@@ -79,6 +80,18 @@ def test_create_scratch_file_none_creates_empty_db(settings):
     assert "sqlar" in table_names
     conn.close()
     os.remove(swp)
+
+
+def test_create_scratch_file_none_sets_pragmas(settings):
+    """Empty scratch files must set version pragmas so SQLiteIO skips migration."""
+    swp = create_scratch_file(None)
+    conn = sqlite3.connect(swp)
+    version = conn.execute("PRAGMA user_version").fetchone()[0]
+    app_id = conn.execute("PRAGMA application_id").fetchone()[0]
+    conn.close()
+    os.remove(swp)
+    assert version == USER_VERSION
+    assert app_id == APPLICATION_ID
 
 
 def test_delete_scratch_file(settings):

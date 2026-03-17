@@ -64,9 +64,14 @@ def create_scratch_file(original: str | None, worker=None) -> str:
     else:
         import sqlite3
 
+        from beeref.fileio.schema import APPLICATION_ID, USER_VERSION
+
         swp = derive_untitled_swp_path()
         conn = sqlite3.connect(swp)
         cursor = conn.cursor()
+        cursor.execute("PRAGMA application_id=%s" % APPLICATION_ID)
+        cursor.execute("PRAGMA user_version=%s" % USER_VERSION)
+        cursor.execute("PRAGMA foreign_keys=ON")
         for sql in SCHEMA:
             cursor.execute(sql)
         conn.commit()

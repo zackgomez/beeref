@@ -518,16 +518,24 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
             )
             return
         assert isinstance(result, fileio.SaveResult)
+        old_filename = self.filename
         self.filename = result.filename
         self.undo_stack.setClean()
-        # Mark newly-saved items so their blobs aren't re-encoded on next save
+        # Mark newly-saved items so their blobs aren't re-encoded on next drain
         for item in self.scene.user_items():
             if isinstance(item, BeePixmapItem) and item.save_id in result.newly_saved:
                 item._blob_saved = True
+        # Rename .swp if target changed (Save-As or first save of untitled)
+        if old_filename != result.filename and self.scene._scratch_file:
+            new_swp = fileio.derive_swp_path(result.filename)
+            if self.scene._scratch_file != new_swp:
+                os.rename(self.scene._scratch_file, new_swp)
+                self.scene._scratch_file = new_swp
 
-    def do_save(self, filename: str, create_new: bool) -> None:
+    def do_save(self, filename: str) -> None:
         if not fileio.is_bee_file(filename):
             filename = f"{filename}.bee"
+        assert self.scene._scratch_file is not None
         # Snapshot scene state on the main thread before handing to
         # the background thread — no Qt objects cross the boundary
         snapshots = self.scene.snapshot_for_save()
@@ -535,7 +543,7 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
             fileio.save_bee,
             filename,
             snapshots,
-            create_new=create_new,
+            self.scene._scratch_file,
         )
         self.worker.finished.connect(self.on_saving_finished)
         self.progress = widgets.BeeProgressDialog(
@@ -553,14 +561,14 @@ class BeeGraphicsView(MainControlsMixin, QtWidgets.QGraphicsView, ActionsMixin):
             filter=f"{constants.APPNAME} File (*.bee)",
         )
         if filename:
-            self.do_save(filename, create_new=True)
+            self.do_save(filename)
 
     def on_action_save(self) -> None:
         self.cancel_active_modes()
         if not self.filename:
             self.on_action_save_as()
         else:
-            self.do_save(self.filename, create_new=False)
+            self.do_save(self.filename)
 
     def on_action_export_scene(self) -> None:
         directory = os.path.dirname(self.filename) if self.filename else None
